@@ -20,6 +20,7 @@ namespace Roulette
 
         private void InitializeComponent()
         {
+            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(MainForm));
             pbWheel = new System.Windows.Forms.PictureBox();
             btnSpin = new System.Windows.Forms.Button();
             txtAddMembers = new System.Windows.Forms.TextBox();
@@ -252,6 +253,7 @@ namespace Roulette
             Controls.Add(pbWheel);
             Controls.Add(btnSpin);
             Controls.Add(btnExit);
+            Icon = (System.Drawing.Icon)resources.GetObject("$this.Icon");
             MinimumSize = new System.Drawing.Size(800, 430);
             Name = "MainForm";
             Text = "Roulette Wheel";
