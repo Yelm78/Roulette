@@ -317,8 +317,8 @@ namespace Roulette
             spinning = true;
             spinStopwatch.Restart();
 
-            // 회전 시간(초) + 0~5초 랜덤 추가
-            totalTime = (float)tbSpinDuration.Value + (random.Next(0, 51) * 0.1f);
+            // 회전 시간(초) + 0 ~ 9.9초 랜덤 추가
+            totalTime = (float)tbSpinDuration.Value + (random.Next(0, 100) * 0.1f);
 
             // 회전수 계산 (랜덤성 부여)
             float baseRotations = (totalTime * 0.6f) * (random.Next(80, 301) * 0.01f);
