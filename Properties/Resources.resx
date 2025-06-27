@@ -121,10 +121,10 @@
   <data name="SPIN" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\SPIN.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
-  <data name="SPIN_80" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\SPIN_80.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  <data name="SPIN2" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\SPIN2.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
-  <data name="SPIN_75" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\SPIN_75.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  <data name="SPIN3" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\SPIN3.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
 </root>

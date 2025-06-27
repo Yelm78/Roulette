@@ -228,6 +228,10 @@ namespace Roulette
             pbSpin.TabIndex = 13;
             pbSpin.TabStop = false;
             pbSpin.Click += btnSpin_Click;
+            pbSpin.DoubleClick += btnSpin_Click;
+            pbSpin.MouseEnter += pbSpin_MouseHover;
+            pbSpin.MouseLeave += pbSpin_MouseLeave;
+            pbSpin.MouseHover += pbSpin_MouseHover;
             // 
             // MainForm
             // 

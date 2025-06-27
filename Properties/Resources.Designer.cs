@@ -73,9 +73,9 @@ namespace Roulette.Properties {
         /// <summary>
         ///   System.Drawing.Bitmap 형식의 지역화된 리소스를 찾습니다.
         /// </summary>
-        internal static System.Drawing.Bitmap SPIN_75 {
+        internal static System.Drawing.Bitmap SPIN2 {
             get {
-                object obj = ResourceManager.GetObject("SPIN_75", resourceCulture);
+                object obj = ResourceManager.GetObject("SPIN2", resourceCulture);
                 return ((System.Drawing.Bitmap)(obj));
             }
         }
@@ -83,9 +83,9 @@ namespace Roulette.Properties {
         /// <summary>
         ///   System.Drawing.Bitmap 형식의 지역화된 리소스를 찾습니다.
         /// </summary>
-        internal static System.Drawing.Bitmap SPIN_80 {
+        internal static System.Drawing.Bitmap SPIN3 {
             get {
-                object obj = ResourceManager.GetObject("SPIN_80", resourceCulture);
+                object obj = ResourceManager.GetObject("SPIN3", resourceCulture);
                 return ((System.Drawing.Bitmap)(obj));
             }
         }
