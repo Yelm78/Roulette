@@ -3,7 +3,7 @@ namespace Roulette
     partial class MainForm
     {
         private System.ComponentModel.IContainer components = null;
-        private System.Windows.Forms.PictureBox pictureBoxWheel;
+        private System.Windows.Forms.PictureBox pbWheel;
         private System.Windows.Forms.Button btnSpin;
         private System.Windows.Forms.TextBox txtAddMembers;
         private System.Windows.Forms.Button btnAddMembers;
@@ -20,7 +20,7 @@ namespace Roulette
 
         private void InitializeComponent()
         {
-            pictureBoxWheel = new System.Windows.Forms.PictureBox();
+            pbWheel = new System.Windows.Forms.PictureBox();
             btnSpin = new System.Windows.Forms.Button();
             txtAddMembers = new System.Windows.Forms.TextBox();
             btnAddMembers = new System.Windows.Forms.Button();
@@ -36,31 +36,34 @@ namespace Roulette
             lblGifts = new System.Windows.Forms.Label();
             tbSpinDuration = new System.Windows.Forms.TrackBar();
             lblSpinDuration = new System.Windows.Forms.Label();
-            ((System.ComponentModel.ISupportInitialize)pictureBoxWheel).BeginInit();
+            btnExit = new System.Windows.Forms.Button();
+            pbSpin = new System.Windows.Forms.PictureBox();
+            ((System.ComponentModel.ISupportInitialize)pbWheel).BeginInit();
             ((System.ComponentModel.ISupportInitialize)dgvMembers).BeginInit();
             ((System.ComponentModel.ISupportInitialize)dgvGifts).BeginInit();
             ((System.ComponentModel.ISupportInitialize)tbSpinDuration).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)pbSpin).BeginInit();
             SuspendLayout();
             // 
-            // pictureBoxWheel
+            // pbWheel
             // 
-            pictureBoxWheel.Anchor = System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right;
-            pictureBoxWheel.Location = new System.Drawing.Point(12, 12);
-            pictureBoxWheel.Name = "pictureBoxWheel";
-            pictureBoxWheel.Size = new System.Drawing.Size(367, 367);
-            pictureBoxWheel.SizeMode = System.Windows.Forms.PictureBoxSizeMode.Zoom;
-            pictureBoxWheel.TabIndex = 0;
-            pictureBoxWheel.TabStop = false;
+            pbWheel.Anchor = System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right;
+            pbWheel.Location = new System.Drawing.Point(12, 12);
+            pbWheel.Name = "pbWheel";
+            pbWheel.Size = new System.Drawing.Size(367, 367);
+            pbWheel.SizeMode = System.Windows.Forms.PictureBoxSizeMode.Zoom;
+            pbWheel.TabIndex = 0;
+            pbWheel.TabStop = false;
             // 
             // btnSpin
             // 
             btnSpin.Anchor = System.Windows.Forms.AnchorStyles.None;
+            btnSpin.BackColor = System.Drawing.Color.Transparent;
             btnSpin.Location = new System.Drawing.Point(155, 155);
             btnSpin.Name = "btnSpin";
             btnSpin.Size = new System.Drawing.Size(80, 80);
             btnSpin.TabIndex = 1;
-            btnSpin.Text = "SPIN";
-            btnSpin.UseVisualStyleBackColor = true;
+            btnSpin.UseVisualStyleBackColor = false;
             btnSpin.Click += btnSpin_Click;
             // 
             // txtAddMembers
@@ -181,13 +184,12 @@ namespace Roulette
             tbSpinDuration.AutoSize = false;
             tbSpinDuration.Location = new System.Drawing.Point(2, 374);
             tbSpinDuration.Maximum = 120;
-            tbSpinDuration.Minimum = 5;
+            tbSpinDuration.Minimum = 10;
             tbSpinDuration.Name = "tbSpinDuration";
             tbSpinDuration.Size = new System.Drawing.Size(343, 15);
-            tbSpinDuration.SmallChange = 5;
             tbSpinDuration.TabIndex = 10;
             tbSpinDuration.TickStyle = System.Windows.Forms.TickStyle.None;
-            tbSpinDuration.Value = 5;
+            tbSpinDuration.Value = 30;
             // 
             // lblSpinDuration
             // 
@@ -200,8 +202,37 @@ namespace Roulette
             lblSpinDuration.Text = "999";
             lblSpinDuration.TextAlign = System.Drawing.ContentAlignment.MiddleRight;
             // 
+            // btnExit
+            // 
+            btnExit.Anchor = System.Windows.Forms.AnchorStyles.None;
+            btnExit.AutoSize = true;
+            btnExit.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink;
+            btnExit.BackColor = System.Drawing.Color.Transparent;
+            btnExit.Location = new System.Drawing.Point(177, 183);
+            btnExit.Name = "btnExit";
+            btnExit.Size = new System.Drawing.Size(36, 25);
+            btnExit.TabIndex = 12;
+            btnExit.Text = "Exit";
+            btnExit.UseVisualStyleBackColor = false;
+            btnExit.Click += btnExit_Click;
+            // 
+            // pbSpin
+            // 
+            pbSpin.Anchor = System.Windows.Forms.AnchorStyles.None;
+            pbSpin.BackColor = System.Drawing.Color.Transparent;
+            pbSpin.BackgroundImage = Properties.Resources.SPIN;
+            pbSpin.BackgroundImageLayout = System.Windows.Forms.ImageLayout.Stretch;
+            pbSpin.Location = new System.Drawing.Point(155, 155);
+            pbSpin.Name = "pbSpin";
+            pbSpin.Size = new System.Drawing.Size(80, 80);
+            pbSpin.TabIndex = 13;
+            pbSpin.TabStop = false;
+            pbSpin.Click += btnSpin_Click;
+            // 
             // MainForm
             // 
+            AcceptButton = btnSpin;
+            CancelButton = btnExit;
             ClientSize = new System.Drawing.Size(784, 391);
             Controls.Add(lblSpinDuration);
             Controls.Add(tbSpinDuration);
@@ -210,19 +241,22 @@ namespace Roulette
             Controls.Add(txtAddGifts);
             Controls.Add(btnAddGifts);
             Controls.Add(dgvGifts);
-            Controls.Add(btnSpin);
             Controls.Add(txtAddMembers);
             Controls.Add(btnAddMembers);
             Controls.Add(dgvMembers);
-            Controls.Add(pictureBoxWheel);
+            Controls.Add(pbSpin);
+            Controls.Add(pbWheel);
+            Controls.Add(btnSpin);
+            Controls.Add(btnExit);
             MinimumSize = new System.Drawing.Size(800, 430);
             Name = "MainForm";
             Text = "Roulette Wheel";
             Resize += MainForm_Resize;
-            ((System.ComponentModel.ISupportInitialize)pictureBoxWheel).EndInit();
+            ((System.ComponentModel.ISupportInitialize)pbWheel).EndInit();
             ((System.ComponentModel.ISupportInitialize)dgvMembers).EndInit();
             ((System.ComponentModel.ISupportInitialize)dgvGifts).EndInit();
             ((System.ComponentModel.ISupportInitialize)tbSpinDuration).EndInit();
+            ((System.ComponentModel.ISupportInitialize)pbSpin).EndInit();
             ResumeLayout(false);
             PerformLayout();
         }
@@ -237,5 +271,7 @@ namespace Roulette
         private System.Windows.Forms.DataGridViewTextBoxColumn gMemberColumn;
         private System.Windows.Forms.TrackBar tbSpinDuration;
         private System.Windows.Forms.Label lblSpinDuration;
+        private System.Windows.Forms.Button btnExit;
+        private System.Windows.Forms.PictureBox pbSpin;
     }
 }
