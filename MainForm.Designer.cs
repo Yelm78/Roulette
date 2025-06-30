@@ -2,7 +2,7 @@ using System.IO;
 
 namespace Roulette
 {
-    partial class MainForm
+    partial class Roulette
     {
         private System.ComponentModel.IContainer components = null;
         private System.Windows.Forms.PictureBox pbWheel;
@@ -31,7 +31,7 @@ namespace Roulette
 
         private void InitializeComponent()
         {
-            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(MainForm));
+            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(Roulette));
             pbWheel = new System.Windows.Forms.PictureBox();
             btnSpin = new System.Windows.Forms.Button();
             txtAddMembers = new System.Windows.Forms.TextBox();
@@ -244,7 +244,7 @@ namespace Roulette
             pbSpin.MouseLeave += pbSpin_MouseLeave;
             pbSpin.MouseHover += pbSpin_MouseHover;
             // 
-            // MainForm
+            // Roulette
             // 
             AcceptButton = btnSpin;
             CancelButton = btnExit;
@@ -265,9 +265,9 @@ namespace Roulette
             Controls.Add(btnExit);
             Icon = (System.Drawing.Icon)resources.GetObject("$this.Icon");
             MinimumSize = new System.Drawing.Size(800, 430);
-            Name = "MainForm";
+            Name = "Roulette";
             Text = "Roulette Wheel";
-            Resize += MainForm_Resize;
+            Resize += Roulette_Resize;
             ((System.ComponentModel.ISupportInitialize)pbWheel).EndInit();
             ((System.ComponentModel.ISupportInitialize)dgvMembers).EndInit();
             ((System.ComponentModel.ISupportInitialize)dgvGifts).EndInit();

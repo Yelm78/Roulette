@@ -14,7 +14,7 @@ using System.Xml.Linq;
 namespace Roulette
 {
     // 룰렛 프로그램의 메인 폼 클래스입니다.
-    public partial class MainForm : Form
+    public partial class Roulette : Form
     {
         // CSV 파일 동시 접근 방지용 객체
         private static readonly object memberCsvLock = new object();
@@ -61,7 +61,7 @@ namespace Roulette
         private string winnerName = null;
 
         // 폼 생성자
-        public MainForm()
+        public Roulette()
         {
             try // [INIT]
             {
@@ -104,7 +104,7 @@ namespace Roulette
                 // 회전 타이머 설정
                 try
                 {
-                    spinTimer.Interval = 10;
+                    spinTimer.Interval = 10; // 10ms마다 Tick (애니메이션 부드럽게)
                     spinTimer.Tick += SpinTimer_Tick;
                 }
                 catch (Exception ex) { LogError("[INIT-SPINTIMER] " + ex); }
@@ -242,8 +242,8 @@ namespace Roulette
             {
                 int w = pbWheel.Width;
                 int cx = w / 2;
-                int needleWidth = Math.Max(w, pbWheel.Height) / 50;
-                int needleHeight = Math.Max(w, pbWheel.Height) / 40;
+                int needleWidth = Math.Max(w, pbWheel.Height) / 50; // 바늘의 두께를 회전판 크기의 1/50로 설정 (비율 유지)
+                int needleHeight = Math.Max(w, pbWheel.Height) / 40; // 바늘의 높이를 회전판 크기의 1/40로 설정 (비율 유지)
                 PointF p1 = new PointF(cx - needleWidth / 2f, 0);
                 PointF p2 = new PointF(cx + needleWidth / 2f, 0);
                 PointF p3 = new PointF(cx, needleHeight);
@@ -291,8 +291,8 @@ namespace Roulette
                 pbWheel.Paint -= SelectionMarker;
                 pbWheel.Paint += SelectionMarker;
 
-                int scale = 5;
-                int size = (Math.Min(pbWheel.Width, pbWheel.Height) - 2) * scale;
+                int scale = 2; // 고해상도 이미지를 만들기 위한 배율 (2배)
+                int size = (Math.Min(pbWheel.Width, pbWheel.Height) - 2) * scale; // 회전판의 크기를 컨트롤 크기 기준으로 정함
                 Bitmap bmp = null;
                 try { bmp = new Bitmap(size, size, System.Drawing.Imaging.PixelFormat.Format32bppArgb); }
                 catch (Exception ex) { LogError("[DRAWWHEELIMAGE-BITMAP] " + ex); throw; }
@@ -302,7 +302,7 @@ namespace Roulette
                     using (Graphics g = Graphics.FromImage(bmp))
                     {
                         g.SmoothingMode = SmoothingMode.AntiAlias;
-                        float sectionAngle = 360f / Math.Max(1, remainingNames.Count);
+                        float sectionAngle = 360f / Math.Max(1, remainingNames.Count); // 남은 멤버 수만큼 섹션을 균등 분할
                         float angleStart = currentAngle;
 
                         List<Brush> pastelBrushes = new List<Brush>();
@@ -320,17 +320,17 @@ namespace Roulette
                                 g.FillPie(brush, 0, 0, size, size, angleStart, sectionAngle);
                                 g.DrawPie(Pens.White, 0, 0, size, size, angleStart, sectionAngle);
 
-                                var midAngle = angleStart + sectionAngle / 2;
-                                double rad = midAngle * Math.PI / 180;
+                                var midAngle = angleStart + sectionAngle / 2; // 섹션의 중앙 각도
+                                double rad = midAngle * Math.PI / 180; // 각도를 라디안으로 변환
 
                                 float centerX = size / 2f;
                                 float centerY = size / 2f;
-                                float outerRadius = size / 2f - 20 * scale;
-                                float innerRadius = size / 4f + 10 * scale;
-                                float textRadius = (outerRadius + innerRadius) / 2f;
+                                float outerRadius = size / 2f - 20 * scale; // 바깥쪽 반지름 (테두리 여백 확보)
+                                float innerRadius = size / 4f + 10 * scale; // 안쪽 반지름 (중앙 구멍 여백 확보)
+                                float textRadius = (outerRadius + innerRadius) / 2f; // 텍스트를 그릴 원의 반지름 (섹션 중앙)
 
-                                float arcLength = (float)(Math.PI * 2 * textRadius * (sectionAngle / 360.0));
-                                float maxTextWidth = arcLength * 0.8f;
+                                float arcLength = (float)(Math.PI * 2 * textRadius * (sectionAngle / 360.0)); // 섹션 호의 길이 (텍스트 최대 폭)
+                                float maxTextWidth = arcLength * 0.8f; // 텍스트가 섹션을 넘지 않도록 80%만 사용
 
                                 float minFont = 5f * scale;
                                 float maxFont = 12f * scale;
@@ -342,7 +342,7 @@ namespace Roulette
                                 { textSize = g.MeasureString(text, testFont); }
                                 while (textSize.Width > maxTextWidth && fontSize > minFont)
                                 {
-                                    fontSize -= 0.5f * scale;
+                                    fontSize -= 0.5f * scale; // 텍스트가 섹션을 넘으면 폰트 크기를 줄임
                                     using (Font testFont = new Font("맑은 고딕", fontSize, FontStyle.Bold))
                                         textSize = g.MeasureString(text, testFont);
                                 }
@@ -365,7 +365,7 @@ namespace Roulette
 
                         try
                         {
-                            int holeSize = (int)(Math.Min(pbWheel.Width, pbWheel.Height) * 0.2 * scale);
+                            int holeSize = (int)(Math.Min(pbWheel.Width, pbWheel.Height) * 0.2 * scale); // 중앙 구멍 크기를 회전판 크기의 20%로 설정
                             int holeX = (size - holeSize) / 2;
                             int holeY = (size - holeSize) / 2;
                             using (GraphicsPath path = new GraphicsPath())
@@ -383,7 +383,7 @@ namespace Roulette
 
                 try
                 {
-                    Bitmap resized = new Bitmap(bmp, Math.Min(pbWheel.Width, pbWheel.Height) - scale, Math.Min(pbWheel.Width, pbWheel.Height) - scale);
+                    Bitmap resized = new Bitmap(bmp, Math.Min(pbWheel.Width, pbWheel.Height) - scale, Math.Min(pbWheel.Width, pbWheel.Height) - scale); // 실제 표시 크기로 다운샘플링
                     bmp.Dispose();
                     return resized;
                 }
@@ -400,7 +400,7 @@ namespace Roulette
                 int r = random.Next(127, 256);
                 int g = random.Next(127, 256);
                 int b = random.Next(127, 256);
-                r = (r + 255) / 2;
+                r = (r + 255) / 2; // 밝은 파스텔톤을 만들기 위해 255와 평균
                 g = (g + 255) / 2;
                 b = (b + 255) / 2;
                 return Color.FromArgb(r, g, b);
@@ -426,7 +426,7 @@ namespace Roulette
 
                     if (pbWheel.Image.Width != pbWheel.Width || pbWheel.Image.Height != pbWheel.Height)
                     {
-                        x = x * pbWheel.Image.Width / pbWheel.Width;
+                        x = x * pbWheel.Image.Width / pbWheel.Width; // 컨트롤 크기와 이미지 크기가 다를 때 비율 변환
                         y = y * pbWheel.Image.Height / pbWheel.Height;
                     }
 
@@ -445,11 +445,11 @@ namespace Roulette
         {
             try // [CENTERSPINBTN]
             {
-                int size = (int)(Math.Min(pbWheel.Width, pbWheel.Height) * 0.25);
-                size = Math.Max(size, 30);
+                int size = (int)(Math.Min(pbWheel.Width, pbWheel.Height) * 0.25); // SPIN 버튼 크기를 회전판의 25%로 설정
+                size = Math.Max(size, 30); // 최소 크기 30 보장
                 pbSpin.Size = new Size(size, size);
 
-                int centerX = pbWheel.Width / 2 - pbSpin.Width / 2;
+                int centerX = pbWheel.Width / 2 - pbSpin.Width / 2; // 중앙 정렬
                 int centerY = pbWheel.Height / 2 - pbSpin.Height / 2;
                 pbSpin.Location = new Point(centerX, centerY);
             }
@@ -473,16 +473,18 @@ namespace Roulette
                 spinning = true;
                 spinStopwatch.Restart();
 
-                totalTime = (float)tbSpinDuration.Value + (random.Next(1, 100) * 0.1f);
+                // 회전 시간(초) + 1 ~ 9.9초 랜덤 추가
+                totalTime = (float)tbSpinDuration.Value + (random.Next(1, 100) * 0.1f); // 트랙바 값(초)에 0.1~9.9초 랜덤 추가로 매번 회전 시간이 달라짐
 
-                float baseRotations = (totalTime * 0.6f) * (random.Next(80, 301) * 0.01f);
-                float boostFactor = 1.0f * (random.Next(100, 301) * 0.01f);
-                float timeThreshold = 10f * (random.Next(50, 201) * 0.01f);
-                float timeRatio = Math.Clamp((totalTime - timeThreshold) / timeThreshold, 0f, 1f);
-                float extraRotations = timeRatio * boostFactor * totalTime * (random.Next(80, 251) * 0.01f);
+                // 회전수 계산 (랜덤성 부여)
+                float baseRotations = (totalTime * 0.6f) * (random.Next(80, 301) * 0.01f); // 전체 시간의 60%에 0.8~3.0배 랜덤 곱 (기본 회전수)
+                float boostFactor = 1.0f * (random.Next(100, 301) * 0.01f); // 1.0~3.0배 랜덤 가중치 (추가 회전수에 사용)
+                float timeThreshold = 10f * (random.Next(50, 201) * 0.01f); // 5~20초 랜덤 (추가 회전수 적용 임계값)
+                float timeRatio = Math.Clamp((totalTime - timeThreshold) / timeThreshold, 0f, 1f); // 임계값 초과 시에만 추가 회전수 비율 적용
+                float extraRotations = timeRatio * boostFactor * totalTime * (random.Next(80, 251) * 0.01f); // 추가 회전수: 비율 * 가중치 * 시간 * 0.8~2.5배 랜덤
 
-                float rotations = baseRotations + extraRotations;
-                totalAngle = 360f * rotations;
+                float rotations = baseRotations + extraRotations; // 최종 회전수 = 기본 + 추가
+                totalAngle = 360f * rotations; // 전체 회전 각도 = 회전수 * 360도
 
                 angle = 0f;
                 elapsedTime = 0f;
@@ -548,12 +550,12 @@ namespace Roulette
 
                 try
                 {
-                    float progress = elapsedTime / totalTime;
-                    float adjustedProgress = (float)Math.Pow(progress, accelerationFactor);
-                    float eased = 1f - (float)Math.Pow(1f - adjustedProgress, decelerationFactor);
+                    float progress = elapsedTime / totalTime; // 전체 진행률 (0~1)
+                    float adjustedProgress = (float)Math.Pow(progress, accelerationFactor); // 가속 곡선 적용 (초반 빠르게)
+                    float eased = 1f - (float)Math.Pow(1f - adjustedProgress, decelerationFactor); // 감속 곡선 적용 (마지막 천천히)
 
-                    angle = eased * totalAngle;
-                    angle %= 360f;
+                    angle = eased * totalAngle; // 최종 각도 = 감속 곡선 * 전체 회전 각도
+                    angle %= 360f; // 0~360도 내로 정규화
 
                     if (cachedWheelImage != null)
                     {
@@ -607,7 +609,7 @@ namespace Roulette
 
                 if (spinning)
                 {
-                    float remain = Math.Max(0, totalTime - elapsedTime);
+                    float remain = Math.Max(0, totalTime - elapsedTime); // 남은 시간(초)
                     string text = ((int)remain).ToString("D3");
                     float fontSize = Math.Max(3, pbSpin.Height / 4f);
 
@@ -618,7 +620,7 @@ namespace Roulette
                         textColor = Color.Red;
                     else
                     {
-                        float t = Math.Clamp((totalTime - remain) / (totalTime - 3f), 0f, 1f);
+                        float t = Math.Clamp((totalTime - remain) / (totalTime - 3f), 0f, 1f); // 3초 이상일 때 검정~빨강 그라데이션
                         int r = (int)(255 * t);
                         textColor = Color.FromArgb(r, 0, 0);
                     }
@@ -645,7 +647,7 @@ namespace Roulette
                         }
                         while (textSize.Width > pbSpin.Width * 0.9f && fontSize > minFontSize)
                         {
-                            fontSize -= 1f;
+                            fontSize -= 1f; // 텍스트가 버튼을 넘지 않도록 폰트 크기 줄임
                             using (Font testFont = new Font("맑은 고딕", fontSize, FontStyle.Bold))
                             {
                                 textSize = gTest.MeasureString(winnerName, testFont);
@@ -670,7 +672,7 @@ namespace Roulette
                         if (string.IsNullOrEmpty(row.Cells["gMemberColumn"].Value?.ToString()))
                             giftCount++;
                     }
-                    double probability = (memberCount > 0) ? (giftCount * 100.0 / memberCount) : 0.0;
+                    double probability = (memberCount > 0) ? (giftCount * 100.0 / memberCount) : 0.0; // 남은 멤버 대비 남은 선물 확률(%) 계산
                     string text = $"\n\n{probability:0.#}%";
 
                     float fontSize = Math.Max(8, pbSpin.Height / 7f);
@@ -695,10 +697,10 @@ namespace Roulette
             try // [GETCURRENTSELECTEDNAME]
             {
                 if (remainingNames.Count == 0) return "";
-                float sectionAngle = 360f / remainingNames.Count;
-                float needleOffset = 270;
-                float normalizedAngle = (needleOffset - angle + 360) % 360;
-                int index = (int)(normalizedAngle / sectionAngle);
+                float sectionAngle = 360f / remainingNames.Count; // 각 멤버가 차지하는 각도 (360도 균등 분할)
+                float needleOffset = 270; // 바늘이 12시 방향(270도) 기준
+                float normalizedAngle = (needleOffset - angle + 360) % 360; // 현재 각도를 0~360도로 정규화
+                int index = (int)(normalizedAngle / sectionAngle); // 바늘이 가리키는 섹션의 인덱스
                 return remainingNames[index];
             }
             catch (Exception ex)
@@ -835,7 +837,7 @@ namespace Roulette
         }
 
         // 폼 크기 변경 시 회전판/버튼 재배치
-        private void MainForm_Resize(object sender, EventArgs e)
+        private void Roulette_Resize(object sender, EventArgs e)
         {
             try { RedrawWheel(); } catch (Exception ex) { LogError("[RESIZE] " + ex); }
         }
