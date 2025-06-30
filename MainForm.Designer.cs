@@ -1,3 +1,5 @@
+using System.IO;
+
 namespace Roulette
 {
     partial class MainForm
@@ -11,9 +13,18 @@ namespace Roulette
 
         protected override void Dispose(bool disposing)
         {
-            if (disposing && (components != null))
+            if (disposing)
             {
-                components.Dispose();
+                cachedWheelImage?.Dispose();
+                btnSpinImage?.Dispose();
+                btnSpin2Image?.Dispose();
+                btnSpin3Image?.Dispose();
+                soundSpinStream?.Dispose();
+                soundResultStream?.Dispose();
+                SoundSpin?.Dispose();
+                SoundResult?.Dispose();
+
+                components?.Dispose();
             }
             base.Dispose(disposing);
         }
@@ -221,7 +232,6 @@ namespace Roulette
             // 
             pbSpin.Anchor = System.Windows.Forms.AnchorStyles.None;
             pbSpin.BackColor = System.Drawing.Color.Transparent;
-            pbSpin.BackgroundImage = Properties.Resources.SPIN;
             pbSpin.BackgroundImageLayout = System.Windows.Forms.ImageLayout.Stretch;
             pbSpin.Location = new System.Drawing.Point(155, 155);
             pbSpin.Name = "pbSpin";

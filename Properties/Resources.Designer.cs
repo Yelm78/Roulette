@@ -63,6 +63,36 @@ namespace Roulette.Properties {
         /// <summary>
         ///   System.Byte[] 형식의 지역화된 리소스를 찾습니다.
         /// </summary>
+        internal static byte[] btnSPIN {
+            get {
+                object obj = ResourceManager.GetObject("btnSPIN", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   System.Byte[] 형식의 지역화된 리소스를 찾습니다.
+        /// </summary>
+        internal static byte[] btnSPIN2 {
+            get {
+                object obj = ResourceManager.GetObject("btnSPIN2", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   System.Byte[] 형식의 지역화된 리소스를 찾습니다.
+        /// </summary>
+        internal static byte[] btnSPIN3 {
+            get {
+                object obj = ResourceManager.GetObject("btnSPIN3", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   System.Byte[] 형식의 지역화된 리소스를 찾습니다.
+        /// </summary>
         internal static byte[] MGM {
             get {
                 object obj = ResourceManager.GetObject("MGM", resourceCulture);
@@ -71,32 +101,22 @@ namespace Roulette.Properties {
         }
         
         /// <summary>
-        ///   System.Drawing.Bitmap 형식의 지역화된 리소스를 찾습니다.
+        ///   System.Byte[] 형식의 지역화된 리소스를 찾습니다.
         /// </summary>
-        internal static System.Drawing.Bitmap SPIN {
+        internal static byte[] SoundResult {
             get {
-                object obj = ResourceManager.GetObject("SPIN", resourceCulture);
-                return ((System.Drawing.Bitmap)(obj));
+                object obj = ResourceManager.GetObject("SoundResult", resourceCulture);
+                return ((byte[])(obj));
             }
         }
         
         /// <summary>
-        ///   System.Drawing.Bitmap 형식의 지역화된 리소스를 찾습니다.
+        ///   System.Byte[] 형식의 지역화된 리소스를 찾습니다.
         /// </summary>
-        internal static System.Drawing.Bitmap SPIN2 {
+        internal static byte[] SoundSpin {
             get {
-                object obj = ResourceManager.GetObject("SPIN2", resourceCulture);
-                return ((System.Drawing.Bitmap)(obj));
-            }
-        }
-        
-        /// <summary>
-        ///   System.Drawing.Bitmap 형식의 지역화된 리소스를 찾습니다.
-        /// </summary>
-        internal static System.Drawing.Bitmap SPIN3 {
-            get {
-                object obj = ResourceManager.GetObject("SPIN3", resourceCulture);
-                return ((System.Drawing.Bitmap)(obj));
+                object obj = ResourceManager.GetObject("SoundSpin", resourceCulture);
+                return ((byte[])(obj));
             }
         }
     }

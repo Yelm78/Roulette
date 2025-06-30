@@ -118,16 +118,22 @@
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
   <assembly alias="System.Windows.Forms" name="System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089" />
+  <data name="btnSPIN" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\btnSPIN.png;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="btnSPIN2" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\btnSPIN2.png;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="btnSPIN3" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\btnSPIN3.png;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
   <data name="MGM" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\MGM.ico;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
-  <data name="SPIN" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\SPIN.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  <data name="SoundResult" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\SoundResult.wav;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
-  <data name="SPIN2" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\SPIN2.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="SPIN3" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\SPIN3.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  <data name="SoundSpin" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\SoundSpin.wav;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
 </root>
