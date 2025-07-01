@@ -10,15 +10,18 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Linq;
 using System.Xml.Linq;
+using static System.Windows.Forms.VisualStyles.VisualStyleElement;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace Roulette
 {
-    // 룰렛 프로그램의 메인 폼 클래스입니다.
     public partial class Roulette : Form
     {
-        // CSV 파일 동시 접근 방지용 객체
+        #region 변수선언
+        // 파일 동시 접근 방지
         private static readonly object memberCsvLock = new object();
         private static readonly object giftCsvLock = new object();
+        private static readonly object logLock = new object();
 
         // 멤버, 남은 멤버, 당첨 멤버 리스트
         private List<string> nameList = new List<string>();
@@ -46,9 +49,9 @@ namespace Roulette
 
         // 회전판 이미지 캐시
         private Bitmap cachedWheelImage = null;
-        private Image btnSpinImage;
-        private Image btnSpin2Image;
-        private Image btnSpin3Image;
+        private System.Drawing.Image btnSpinImage;
+        private System.Drawing.Image btnSpin2Image;
+        private System.Drawing.Image btnSpin3Image;
 
         // 사운드 파일 메모리 스트림
         private MemoryStream soundSpinStream;
@@ -59,6 +62,7 @@ namespace Roulette
 
         // 당첨자 이름
         private string winnerName = null;
+        #endregion
 
         // 폼 생성자
         public Roulette()
@@ -67,79 +71,43 @@ namespace Roulette
             {
                 InitializeComponent();
 
-                // 폰트 통일
-                try // [INIT-FONT]
-                {
-                    this.Font = new Font("맑은 고딕", 9F, FontStyle.Regular);
-                    foreach (Control ctl in this.Controls)
-                        ctl.Font = new Font("맑은 고딕", ctl.Font.Size, ctl.Font.Style);
-                }
-                catch (Exception ex) { LogError("[INIT-FONT] " + ex); }
+                LogWrite("[Application Launch] ");
 
-                // SPIN 버튼 이미지 로드
-                try // [INIT-SPINIMG]
-                {
-                    btnSpinImage = Image.FromStream(new MemoryStream(Properties.Resources.btnSPIN));
-                    btnSpin2Image = Image.FromStream(new MemoryStream(Properties.Resources.btnSPIN2));
-                    btnSpin3Image = Image.FromStream(new MemoryStream(Properties.Resources.btnSPIN3));
-                    pbSpin.BackgroundImage = btnSpinImage;
-                }
-                catch (Exception ex) { LogError("[INIT-SPINIMG] " + ex); }
+                // 폼과 모든 컨트롤의 폰트를 "맑은 고딕"으로 통일
+                try { this.Font = new System.Drawing.Font("맑은 고딕", 9F, FontStyle.Regular); foreach (Control ctl in this.Controls) ctl.Font = new System.Drawing.Font("맑은 고딕", ctl.Font.Size, ctl.Font.Style); } catch (Exception ex) { LogWrite("[INIT-FONT] " + ex); }
 
-                // SPIN 버튼 Paint 이벤트 연결
-                try { pbSpin.Paint += RemainSeconds; } catch (Exception ex) { LogError("[INIT-SPINPAINT] " + ex); }
+                // SPIN 버튼에 사용할 이미지 3종을 메모리에서 불러옴
+                try { btnSpinImage = System.Drawing.Image.FromStream(new MemoryStream(Properties.Resources.btnSPIN)); btnSpin2Image = System.Drawing.Image.FromStream(new MemoryStream(Properties.Resources.btnSPIN2)); btnSpin3Image = System.Drawing.Image.FromStream(new MemoryStream(Properties.Resources.btnSPIN3)); pbSpin.BackgroundImage = btnSpinImage; } catch (Exception ex) { LogWrite("[INIT-SPINIMG] " + ex); }
 
-                // SPIN 버튼을 회전판 위에 올리고 투명하게
-                try
-                {
-                    pbSpin.BackColor = Color.Transparent;
-                    pbSpin.Parent = pbWheel;
-                    pbSpin.BringToFront();
-                }
-                catch (Exception ex) { LogError("[INIT-SPINPARENT] " + ex); }
+                // SPIN 버튼에 남은 시간/당첨자 표시를 위한 Paint 이벤트 연결
+                try { pbSpin.Paint += RemainSeconds; } catch (Exception ex) { LogWrite("[INIT-SPINPAINT] " + ex); }
 
-                // 회전판 크기 변경 시 SPIN 버튼 위치 재조정
-                try { pbWheel.Resize += (s, e) => CenterSpinButton(); } catch (Exception ex) { LogError("[INIT-WHEELRESIZE] " + ex); }
+                // SPIN 버튼을 회전판 위에 올리고, 배경을 투명하게 설정
+                try { pbSpin.BackColor = Color.Transparent; pbSpin.Parent = pbWheel; pbSpin.BringToFront(); } catch (Exception ex) { LogWrite("[INIT-SPINPARENT] " + ex); }
 
-                // 회전 타이머 설정
-                try
-                {
-                    spinTimer.Interval = 10; // 10ms마다 Tick (애니메이션 부드럽게)
-                    spinTimer.Tick += SpinTimer_Tick;
-                }
-                catch (Exception ex) { LogError("[INIT-SPINTIMER] " + ex); }
+                // 회전판 크기가 바뀔 때마다 SPIN 버튼 위치를 중앙으로 재조정
+                try { pbWheel.Resize += (s, e) => CenterSpinButton(); } catch (Exception ex) { LogWrite("[INIT-WHEELRESIZE] " + ex); }
 
-                // 사운드 파일 로드
-                try
-                {
-                    soundSpinStream = new MemoryStream(Properties.Resources.SoundSpin);
-                    SoundSpin = new SoundPlayer(soundSpinStream);
-                    SoundSpin.Load();
-                }
-                catch (Exception ex) { LogError("[INIT-SOUNDSPIN] " + ex); }
-                try
-                {
-                    soundResultStream = new MemoryStream(Properties.Resources.SoundResult);
-                    SoundResult = new SoundPlayer(soundResultStream);
-                    SoundResult.Load();
-                }
-                catch (Exception ex) { LogError("[INIT-SOUNDRESULT] " + ex); }
+                // 회전판 그리기 이벤트 연결 (Paint 이벤트)
+                try { pbWheel.Paint += pbWheel_Paint; } catch (Exception ex) { LogWrite("[INIT-WHEELPAINT] " + ex); }
 
-                // 트랙바 이벤트 연결 및 초기화
-                try
-                {
-                    tbSpinDuration.ValueChanged += TbSpinDuration_ValueChanged;
-                    TbSpinDuration_ValueChanged(null, null);
-                }
-                catch (Exception ex) { LogError("[INIT-SPINDURATION] " + ex); }
+                // 회전 애니메이션 타이머 설정 (10ms마다 Tick 발생)
+                try { spinTimer.Interval = 10; spinTimer.Tick += SpinTimer_Tick; } catch (Exception ex) { LogWrite("[INIT-SPINTIMER] " + ex); }
 
-                // 멤버/선물 파일 비동기 로드
-                try { _ = LoadCsvFilesAsync(); } catch (Exception ex) { LogError("[INIT-LOADCSV] " + ex); }
+                // 사운드 파일을 메모리에서 불러와서 SoundPlayer에 등록
+                try { soundSpinStream = new MemoryStream(Properties.Resources.SoundSpin); SoundSpin = new SoundPlayer(soundSpinStream); SoundSpin.Load(); } catch (Exception ex) { LogWrite("[INIT-SOUNDSPIN] " + ex); }
+                try { soundResultStream = new MemoryStream(Properties.Resources.SoundResult); SoundResult = new SoundPlayer(soundResultStream); SoundResult.Load(); } catch (Exception ex) { LogWrite("[INIT-SOUNDRESULT] " + ex); }
 
-                // 회전판 이미지 그리기
-                try { RedrawWheel(); } catch (Exception ex) { LogError("[INIT-REDRAWWHEEL] " + ex); }
+                // 트랙바 값이 바뀔 때마다 라벨에 표시
+                try { tbSpinDuration.ValueChanged += TbSpinDuration_ValueChanged; TbSpinDuration_ValueChanged(null, null); } catch (Exception ex) { LogWrite("[INIT-SPINDURATION] " + ex); }
+
+                // 멤버/선물 CSV 파일을 비동기로 읽어와서 UI에 반영
+                try { _ = LoadCsvFilesAsync(); } catch (Exception ex) { LogWrite("[INIT-LOADCSV] " + ex); }
+
+                //// 회전판 이미지 그리기 (최초 1회)
+                //try { RedrawWheel(); } catch (Exception ex) { LogError("[INIT-REDRAWWHEEL] " + ex); }
             }
-            catch (Exception ex) { LogError("[INIT] " + ex); }
+            catch (Exception ex) { LogWrite("[INIT] " + ex); }
         }
 
         // 트랙바 값 변경 시 라벨 표시
@@ -149,7 +117,7 @@ namespace Roulette
             {
                 lblSpinDuration.Text = $"{tbSpinDuration.Value}초";
             }
-            catch (Exception ex) { LogError("[SPINDURATION-LABEL] " + ex); }
+            catch (Exception ex) { LogWrite("[SPINDURATION-LABEL] " + ex); }
         }
 
         // 멤버/선물 CSV 파일 비동기 로드 및 UI 반영
@@ -165,7 +133,7 @@ namespace Roulette
             }
             catch (Exception ex)
             {
-                LogError("[LOADCSV-READ] " + ex);
+                LogWrite("[LOADCSV-READ] " + ex);
                 MessageBox.Show("CSV 파일을 읽는 중 오류가 발생했습니다.\nCSV 파일을 닫고 다시 실행하세요.:\n" + ex.Message, "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 memberLines = Array.Empty<string>();
                 giftLines = Array.Empty<string>();
@@ -185,7 +153,7 @@ namespace Roulette
                         dgvMembers.Rows.Clear();
                         dgvGifts.Rows.Clear();
                     }
-                    catch (Exception ex) { LogError("[LOADCSV-UIUPDATE-CLEAR] " + ex); }
+                    catch (Exception ex) { LogWrite("[LOADCSV-UIUPDATE-CLEAR] " + ex); }
 
                     foreach (var line in memberLines)
                     {
@@ -208,7 +176,7 @@ namespace Roulette
                                     remainingNames.Add(name);
                             }
                         }
-                        catch (Exception ex) { LogError("[LOADCSV-UIUPDATE-MEMBERROW] " + ex); }
+                        catch (Exception ex) { LogWrite("[LOADCSV-UIUPDATE-MEMBERROW] " + ex); }
                     }
 
                     foreach (var line in giftLines)
@@ -226,13 +194,13 @@ namespace Roulette
                                 dgvGifts.Rows[rowIndex].Cells["gMemberColumn"].Value = member;
                             }
                         }
-                        catch (Exception ex) { LogError("[LOADCSV-UIUPDATE-GIFTROW] " + ex); }
+                        catch (Exception ex) { LogWrite("[LOADCSV-UIUPDATE-GIFTROW] " + ex); }
                     }
                 }, CancellationToken.None, TaskCreationOptions.None, TaskScheduler.FromCurrentSynchronizationContext());
             }
-            catch (Exception ex) { LogError("[LOADCSV-UIUPDATE] " + ex); }
+            catch (Exception ex) { LogWrite("[LOADCSV-UIUPDATE] " + ex); }
 
-            try { RedrawWheel(); } catch (Exception ex) { LogError("[LOADCSV-REDRAWWHEEL] " + ex); }
+            try { RedrawWheel(); } catch (Exception ex) { LogWrite("[LOADCSV-REDRAWWHEEL] " + ex); }
         }
 
         // 회전판 위에 바늘(삼각형) 그리기
@@ -254,36 +222,41 @@ namespace Roulette
                 using (Pen pen = new Pen(SystemColors.Control, 2))
                     e.Graphics.DrawPolygon(pen, new[] { p1, p2, p3 });
             }
-            catch (Exception ex) { LogError("[SELECTIONMARKER] " + ex); }
+            catch (Exception ex) { LogWrite("[SELECTIONMARKER] " + ex); }
         }
 
         // 회전판 이미지 새로 그리기
+        // 회전판에 표시될 섹션(멤버 이름 등)을 모두 그려서 Bitmap으로 만들어 저장
+        // spinning(회전 중)일 때는 새로 그리지 않음 (메모리 누수 방지)
         private void RedrawWheel()
         {
+            if (spinning) return; // 회전 중에는 새로 그리지 않음
+
             try // [REDRAWWHEEL]
             {
                 angle = 0;
+                // 기존 이미지가 있으면 메모리 해제
                 if (pbWheel.Image != null && pbWheel.Image != cachedWheelImage)
                     pbWheel.Image.Dispose();
+                pbWheel.Image = null; // 이전 이미지 참조 해제
                 cachedWheelImage?.Dispose();
                 try
                 {
+                    // 새 회전판 이미지를 생성해서 캐시에 저장
                     cachedWheelImage = DrawWheelImage(angle);
                     pbWheel.Image = cachedWheelImage ?? throw new Exception("회전판 이미지 생성 실패");
                 }
                 catch (Exception ex)
                 {
                     pbWheel.Image = null;
-                    LogError("[REDRAWWHEEL-DRAW] " + ex);
-                    MessageBox.Show("회전판 이미지를 생성할 수 없습니다.\n" + ex.Message, "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
                 UpdatePbSpinBackColor();
                 CenterSpinButton();
             }
-            catch (Exception ex) { LogError("[REDRAWWHEEL] " + ex); }
+            catch (Exception ex) { LogWrite("[REDRAWWHEEL] " + ex); }
         }
 
-        // 고해상도 회전판 이미지 생성
+        // 고해상도 회전판 이미지 생성 (남은 멤버 수에 따라 섹션을 나누고, 각 섹션에 이름 draw)
         private Bitmap DrawWheelImage(float currentAngle)
         {
             try // [DRAWWHEELIMAGE]
@@ -295,7 +268,7 @@ namespace Roulette
                 int size = (Math.Min(pbWheel.Width, pbWheel.Height) - 2) * scale; // 회전판의 크기를 컨트롤 크기 기준으로 정함
                 Bitmap bmp = null;
                 try { bmp = new Bitmap(size, size, System.Drawing.Imaging.PixelFormat.Format32bppArgb); }
-                catch (Exception ex) { LogError("[DRAWWHEELIMAGE-BITMAP] " + ex); throw; }
+                catch (Exception ex) { LogWrite("[DRAWWHEELIMAGE-BITMAP] " + ex); throw; }
 
                 try
                 {
@@ -308,12 +281,14 @@ namespace Roulette
                         List<Brush> pastelBrushes = new List<Brush>();
                         for (int i = 0; i < remainingNames.Count; i++)
                         {
+                            // 각 섹션마다 파스텔톤 색상 브러시 생성
                             try { pastelBrushes.Add(new SolidBrush(GetRandomPastelColor())); }
-                            catch (Exception ex) { LogError("[DRAWWHEELIMAGE-COLOR] " + ex); }
+                            catch (Exception ex) { LogWrite("[DRAWWHEELIMAGE-COLOR] " + ex); }
                         }
 
                         for (int i = 0; i < remainingNames.Count; i++)
                         {
+                            // 각 멤버 이름을 섹션에 그림
                             try
                             {
                                 Brush brush = pastelBrushes[i];
@@ -338,16 +313,16 @@ namespace Roulette
                                 string text = remainingNames[i];
                                 SizeF textSize;
 
-                                using (Font testFont = new Font("맑은 고딕", fontSize, FontStyle.Bold))
+                                using (System.Drawing.Font testFont = new System.Drawing.Font("맑은 고딕", fontSize, FontStyle.Bold))
                                 { textSize = g.MeasureString(text, testFont); }
                                 while (textSize.Width > maxTextWidth && fontSize > minFont)
                                 {
                                     fontSize -= 0.5f * scale; // 텍스트가 섹션을 넘으면 폰트 크기를 줄임
-                                    using (Font testFont = new Font("맑은 고딕", fontSize, FontStyle.Bold))
+                                    using (System.Drawing.Font testFont = new System.Drawing.Font("맑은 고딕", fontSize, FontStyle.Bold))
                                         textSize = g.MeasureString(text, testFont);
                                 }
 
-                                using (Font font = new Font("맑은 고딕", fontSize, FontStyle.Bold))
+                                using (System.Drawing.Font font = new System.Drawing.Font("맑은 고딕", fontSize, FontStyle.Bold))
                                 {
                                     float x = (float)(centerX + Math.Cos(rad) * textRadius);
                                     float y = (float)(centerY + Math.Sin(rad) * textRadius);
@@ -357,14 +332,15 @@ namespace Roulette
                                     g.DrawString(text, font, Brushes.Black, -textSize.Width / 2, -textSize.Height / 2);
                                     g.ResetTransform();
                                 }
-
+                                brush.Dispose();
                                 angleStart += sectionAngle;
                             }
-                            catch (Exception ex) { LogError("[DRAWWHEELIMAGE-SECTION] " + ex); }
+                            catch (Exception ex) { LogWrite("[DRAWWHEELIMAGE-SECTION] " + ex); }
                         }
 
                         try
                         {
+                            // 중앙 구멍(원)을 그림
                             int holeSize = (int)(Math.Min(pbWheel.Width, pbWheel.Height) * 0.2 * scale); // 중앙 구멍 크기를 회전판 크기의 20%로 설정
                             int holeX = (size - holeSize) / 2;
                             int holeY = (size - holeSize) / 2;
@@ -376,20 +352,22 @@ namespace Roulette
                                 g.ResetClip();
                             }
                         }
-                        catch (Exception ex) { LogError("[DRAWWHEELIMAGE-HOLE] " + ex); }
+                        catch (Exception ex) { LogWrite("[DRAWWHEELIMAGE-HOLE] " + ex); }
+                        pastelBrushes.Clear();
                     }
                 }
-                catch (Exception ex) { LogError("[DRAWWHEELIMAGE-GRAPHICS] " + ex); throw; }
+                catch (Exception ex) { LogWrite("[DRAWWHEELIMAGE-GRAPHICS] " + ex); throw; }
 
                 try
                 {
-                    Bitmap resized = new Bitmap(bmp, Math.Min(pbWheel.Width, pbWheel.Height) - scale, Math.Min(pbWheel.Width, pbWheel.Height) - scale); // 실제 표시 크기로 다운샘플링
+                    // 실제 표시 크기로 다운샘플링 (고해상도 -> 실제 크기)
+                    Bitmap resized = new Bitmap(bmp, Math.Min(pbWheel.Width, pbWheel.Height) - scale, Math.Min(pbWheel.Width, pbWheel.Height) - scale);
                     bmp.Dispose();
                     return resized;
                 }
-                catch (Exception ex) { LogError("[DRAWWHEELIMAGE-RESIZE] " + ex); bmp?.Dispose(); throw; }
+                catch (Exception ex) { LogWrite("[DRAWWHEELIMAGE-RESIZE] " + ex); bmp?.Dispose(); throw; }
             }
-            catch (Exception ex) { LogError("[DRAWWHEELIMAGE] " + ex); throw; }
+            catch (Exception ex) { LogWrite("[DRAWWHEELIMAGE] " + ex); throw; }
         }
 
         // 파스텔톤 랜덤 색상 생성
@@ -405,7 +383,7 @@ namespace Roulette
                 b = (b + 255) / 2;
                 return Color.FromArgb(r, g, b);
             }
-            catch (Exception ex) { LogError("[GETPASTELCOLOR] " + ex); return Color.Gray; }
+            catch (Exception ex) { LogWrite("[GETPASTELCOLOR] " + ex); return Color.Gray; }
         }
 
         // SPIN 버튼 배경색을 회전판과 맞춤
@@ -413,31 +391,34 @@ namespace Roulette
         {
             try // [UPDATESPINBACK]
             {
-                if (pbSpin.IsDisposed || !pbSpin.IsHandleCreated) return;
-                if (pbWheel.Image is not Bitmap bmp) return;
-
-                if (!pbSpin.IsDisposed && pbSpin.IsHandleCreated)
+                if (this.WindowState != FormWindowState.Minimized)
                 {
-                    var spinCenter = pbSpin.PointToScreen(new Point(pbSpin.Width / 2, pbSpin.Height / 2));
-                    var wheelOrigin = pbWheel.PointToScreen(Point.Empty);
+                    if (pbSpin.IsDisposed || !pbSpin.IsHandleCreated) return;
+                    if (pbWheel.Image is not Bitmap bmp) return;
 
-                    int x = spinCenter.X - wheelOrigin.X;
-                    int y = spinCenter.Y - wheelOrigin.Y;
-
-                    if (pbWheel.Image.Width != pbWheel.Width || pbWheel.Image.Height != pbWheel.Height)
+                    if (!pbSpin.IsDisposed && pbSpin.IsHandleCreated)
                     {
-                        x = x * pbWheel.Image.Width / pbWheel.Width; // 컨트롤 크기와 이미지 크기가 다를 때 비율 변환
-                        y = y * pbWheel.Image.Height / pbWheel.Height;
-                    }
+                        var spinCenter = pbSpin.PointToScreen(new Point(pbSpin.Width / 2, pbSpin.Height / 2));
+                        var wheelOrigin = pbWheel.PointToScreen(Point.Empty);
 
-                    if (x >= 0 && y >= 0 && x < bmp.Width && y < bmp.Height)
-                    {
-                        Color color = bmp.GetPixel(x, y);
-                        pbSpin.BackColor = color;
+                        int x = spinCenter.X - wheelOrigin.X;
+                        int y = spinCenter.Y - wheelOrigin.Y;
+
+                        if (pbWheel.Image.Width != pbWheel.Width || pbWheel.Image.Height != pbWheel.Height)
+                        {
+                            x = x * pbWheel.Image.Width / pbWheel.Width; // 컨트롤 크기와 이미지 크기가 다를 때 비율 변환
+                            y = y * pbWheel.Image.Height / pbWheel.Height;
+                        }
+
+                        if (x >= 0 && y >= 0 && x < bmp.Width && y < bmp.Height)
+                        {
+                            Color color = bmp.GetPixel(x, y);
+                            pbSpin.BackColor = color;
+                        }
                     }
                 }
             }
-            catch (Exception ex) { LogError("[UPDATESPINBACK] " + ex); }
+            catch (Exception ex) { LogWrite("[UPDATESPINBACK] " + ex); }
         }
 
         // SPIN 버튼을 회전판 중앙에 위치
@@ -453,7 +434,7 @@ namespace Roulette
                 int centerY = pbWheel.Height / 2 - pbSpin.Height / 2;
                 pbSpin.Location = new Point(centerX, centerY);
             }
-            catch (Exception ex) { LogError("[CENTERSPINBTN] " + ex); }
+            catch (Exception ex) { LogWrite("[CENTERSPINBTN] " + ex); }
         }
 
         // SPIN 버튼 클릭 시 회전 시작
@@ -461,11 +442,12 @@ namespace Roulette
         {
             try // [SPINCLICK]
             {
-                try { soundSpinStream.Position = 0; SoundSpin?.PlayLooping(); } catch (Exception ex) { LogError("[SPINCLICK-SOUND] " + ex); }
-                try { pbWheel.Image = DrawWheelImage(angle); } catch (Exception ex) { LogError("[SPINCLICK-DRAWWHEEL] " + ex); }
-                try { RedrawWheel(); } catch (Exception ex) { LogError("[SPINCLICK-REDRAW] " + ex); }
-                try { pbSpin.Invalidate(); } catch (Exception ex) { LogError("[SPINCLICK-INVALIDATE] " + ex); }
+                try { soundSpinStream.Position = 0; SoundSpin?.PlayLooping(); } catch (Exception ex) { LogWrite("[SPINCLICK-SOUND] " + ex); }
+                //try { pbWheel.Image = DrawWheelImage(angle); } catch (Exception ex) { LogError("[SPINCLICK-DRAWWHEEL] " + ex); }
+                //try { RedrawWheel(); } catch (Exception ex) { LogError("[SPINCLICK-REDRAW] " + ex); }
+                try { pbSpin.Invalidate(); } catch (Exception ex) { LogWrite("[SPINCLICK-INVALIDATE] " + ex); }
 
+                pbSpin.BackgroundImage = null;
                 pbSpin.BackgroundImage = btnSpin3Image;
                 winnerName = null;
 
@@ -486,18 +468,20 @@ namespace Roulette
                 float rotations = baseRotations + extraRotations; // 최종 회전수 = 기본 + 추가
                 totalAngle = 360f * rotations; // 전체 회전 각도 = 회전수 * 360도
 
+                LogWrite("[Start Spin] SpinTime(s): " + tbSpinDuration.Value.ToString() + "+" + (totalTime - (float)tbSpinDuration.Value).ToString() + " / r:" + totalAngle.ToString());
+
                 angle = 0f;
                 elapsedTime = 0f;
 
-                try { spinTimer.Start(); } catch (Exception ex) { LogError("[SPINCLICK-TIMERSTART] " + ex); }
+                try { spinTimer.Start(); } catch (Exception ex) { LogWrite("[SPINCLICK-TIMERSTART] " + ex); }
             }
-            catch (Exception ex) { LogError("[SPINCLICK] " + ex); }
+            catch (Exception ex) { LogWrite("[SPINCLICK] " + ex); }
         }
 
         // 타이머 Tick마다 회전 애니메이션 처리
         private void SpinTimer_Tick(object sender, EventArgs e)
         {
-            try { ThreadSpinTimer_Tick(); } catch (Exception ex) { LogError("[SPINTIMER-TICK] " + ex); }
+            try { ThreadSpinTimer_Tick(); } catch (Exception ex) { LogWrite("[SPINTIMER-TICK] " + ex); }
         }
         private void ThreadSpinTimer_Tick()
         {
@@ -515,18 +499,34 @@ namespace Roulette
                 try { elapsedTime = spinStopwatch.ElapsedMilliseconds / 1000f; }
                 catch (Exception ex)
                 {
-                    LogError("[SPINTIMER-ELAPSED] " + ex);
+                    LogWrite("[SPINTIMER-ELAPSED] " + ex);
                     MessageBox.Show("회전 중 오류(1)):\n" + ex.Message, "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    try { spinTimer.Stop(); } catch (Exception e) { LogError("[SPINTIMER-STOP1] " + e); }
+                    try { spinTimer.Stop(); } catch (Exception e) { LogWrite("[SPINTIMER-STOP1] " + e); }
                     spinning = false;
+                }
+
+                // 회전 중 메모리 사용량 기록
+                if (spinning)
+                {
+                    try
+                    {
+                        var proc = Process.GetCurrentProcess();
+                        long workingSet = proc.WorkingSet64;
+                        long privateBytes = proc.PrivateMemorySize64;
+                        //LogError($"[MEMORY] WS={workingSet / 1048576}MB, PM={privateBytes / 1048576}MB");
+                    }
+                    catch (Exception ex)
+                    {
+                        //LogError("[MEMORY-LOG] " + ex);
+                    }
                 }
 
                 if (elapsedTime >= totalTime)
                 {
                     elapsedTime = totalTime;
-                    try { spinTimer.Stop(); } catch (Exception ex) { LogError("[SPINTIMER-STOP2] " + ex); }
-                    try { SoundSpin?.Stop(); } catch (Exception ex) { LogError("[SPINTIMER-SOUNDSTOP] " + ex); }
-                    try { soundResultStream.Position = 0; SoundResult?.Play(); } catch (Exception ex) { LogError("[SPINTIMER-RESULTSOUND] " + ex); }
+                    try { spinTimer.Stop(); } catch (Exception ex) { LogWrite("[SPINTIMER-STOP2] " + ex); }
+                    try { SoundSpin?.Stop(); } catch (Exception ex) { LogWrite("[SPINTIMER-SOUNDSTOP] " + ex); }
+                    try { soundResultStream.Position = 0; SoundResult?.Play(); } catch (Exception ex) { LogWrite("[SPINTIMER-RESULTSOUND] " + ex); }
                     spinning = false;
                     try
                     {
@@ -537,12 +537,13 @@ namespace Roulette
 
                         winnerName = "Win!\n" + result;
                         pbSpin.Invalidate();
+                        LogWrite("Selected Member: " + result);
                     }
                     catch (Exception ex)
                     {
-                        LogError("[SPINTIMER-RESULT] " + ex);
+                        LogWrite("[SPINTIMER-RESULT] " + ex);
                         MessageBox.Show("회전 중 오류(2)):\n" + ex.Message, "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                        try { spinTimer.Stop(); } catch (Exception e) { LogError("[SPINTIMER-STOP3] " + e); }
+                        try { spinTimer.Stop(); } catch (Exception e) { LogWrite("[SPINTIMER-STOP3] " + e); }
                         spinning = false;
                     }
                     return;
@@ -557,26 +558,57 @@ namespace Roulette
                     angle = eased * totalAngle; // 최종 각도 = 감속 곡선 * 전체 회전 각도
                     angle %= 360f; // 0~360도 내로 정규화
 
-                    if (cachedWheelImage != null)
-                    {
-                        var oldImage = pbWheel.Image;
-                        var rotated = RotateImage(cachedWheelImage, angle);
-                        pbWheel.Image = rotated;
-                        if (oldImage != null && oldImage != cachedWheelImage)
-                            oldImage.Dispose();
-                    }
+                    pbWheel.Invalidate(); /* Paint에서 회전만 적용 */
+                    //// 회전 애니메이션 중
+                    //if (cachedWheelImage != null)
+                    //{
+                    //    var oldImage = pbWheel.Image;
+                    //    var rotated = RotateImage(cachedWheelImage, angle);
+                    //    pbWheel.Image = rotated;
+
+                    //    if (oldImage != null && oldImage != cachedWheelImage)
+                    //        oldImage.Dispose();
+                    //}
                 }
                 catch (Exception ex)
                 {
-                    LogError("[SPINTIMER-ROTATE] " + ex);
+                    LogWrite("[SPINTIMER-ROTATE] " + ex);
                     MessageBox.Show("회전 중 오류(3)):\n" + ex.Message, "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    try { spinTimer.Stop(); } catch (Exception e) { LogError("[SPINTIMER-STOP4] " + e); }
+                    try { spinTimer.Stop(); } catch (Exception e) { LogWrite("[SPINTIMER-STOP4] " + e); }
                     spinning = false;
                 }
                 UpdatePbSpinBackColor();
                 pbSpin.Invalidate();
             }
-            catch (Exception ex) { LogError("[SPINTIMER-THREADTICK] " + ex); }
+            catch (Exception ex) { LogWrite("[SPINTIMER-THREADTICK] " + ex); }
+        }
+
+        // private Bitmap RotateImage(Bitmap src, float angle) 대체, 메모리 누수 문제로 수정함
+        // cachedWheelImage를 사용, 회전 애니메이션은 Graphics의 Transform 으로 처리
+        private void pbWheel_Paint(object sender, PaintEventArgs e)
+        {
+            if (cachedWheelImage != null)
+            {
+                // 그래픽 품질을 부드럽게 설정
+                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+
+                // 회전판의 중심 좌표 계산
+                float cx = pbWheel.Width / 2f;
+                float cy = pbWheel.Height / 2f;
+
+                // 중심으로 이동
+                e.Graphics.TranslateTransform(cx, cy);
+                // 현재 각도만큼 회전
+                e.Graphics.RotateTransform(angle);
+                // 이미지의 중심이 컨트롤의 중심에 오도록 다시 이동
+                e.Graphics.TranslateTransform(-cachedWheelImage.Width / 2f, -cachedWheelImage.Height / 2f);
+
+                // 회전된 상태로 회전판 이미지를 그림
+                e.Graphics.DrawImage(cachedWheelImage, 0, 0, cachedWheelImage.Width, cachedWheelImage.Height);
+
+                // 변환 초기화(다음 그리기를 위해)
+                e.Graphics.ResetTransform();
+            }
         }
 
         // 이미지를 지정 각도만큼 회전
@@ -596,7 +628,7 @@ namespace Roulette
                 }
                 return dst;
             }
-            catch (Exception ex) { LogError("[ROTATEIMAGE] " + ex); return null; }
+            catch (Exception ex) { LogWrite("[ROTATEIMAGE] " + ex); return null; }
         }
 
         // SPIN 버튼에 남은 시간/당첨자 이름 표시
@@ -625,11 +657,15 @@ namespace Roulette
                         textColor = Color.FromArgb(r, 0, 0);
                     }
 
-                    using (Font font = new Font("맑은 고딕", fontSize, FontStyle.Bold))
+                    using (System.Drawing.Font font = new System.Drawing.Font("맑은 고딕", fontSize, FontStyle.Bold))
                     using (Brush brush = new SolidBrush(textColor))
                     using (StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
                     {
                         g.DrawString(text, font, brush, pbSpin.ClientRectangle, sf);
+                        text = null;
+                        font.Dispose();
+                        brush.Dispose();
+                        sf.Dispose();
                     }
                 }
                 else if (!string.IsNullOrEmpty(winnerName))
@@ -641,25 +677,29 @@ namespace Roulette
 
                     using (Graphics gTest = pbSpin.CreateGraphics())
                     {
-                        using (Font testFont = new Font("맑은 고딕", fontSize, FontStyle.Bold))
+                        using (System.Drawing.Font testFont = new System.Drawing.Font("맑은 고딕", fontSize, FontStyle.Bold))
                         {
                             textSize = gTest.MeasureString(winnerName, testFont);
                         }
                         while (textSize.Width > pbSpin.Width * 0.9f && fontSize > minFontSize)
                         {
                             fontSize -= 1f; // 텍스트가 버튼을 넘지 않도록 폰트 크기 줄임
-                            using (Font testFont = new Font("맑은 고딕", fontSize, FontStyle.Bold))
+                            using (System.Drawing.Font testFont = new System.Drawing.Font("맑은 고딕", fontSize, FontStyle.Bold))
                             {
                                 textSize = gTest.MeasureString(winnerName, testFont);
                             }
                         }
                     }
 
-                    using (Font font = new Font("맑은 고딕", fontSize, FontStyle.Bold))
+                    using (System.Drawing.Font font = new System.Drawing.Font("맑은 고딕", fontSize, FontStyle.Bold))
                     using (Brush brush = new SolidBrush(Color.Blue))
                     using (StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
                     {
                         g.DrawString(winnerName, font, brush, pbSpin.ClientRectangle, sf);
+                        winnerName = null;
+                        font.Dispose();
+                        brush.Dispose();
+                        sf.Dispose();
                     }
                 }
                 else
@@ -676,17 +716,21 @@ namespace Roulette
                     string text = $"\n\n{probability:0.#}%";
 
                     float fontSize = Math.Max(8, pbSpin.Height / 7f);
-                    using (Font font = new Font("맑은 고딕", fontSize, FontStyle.Bold))
+                    using (System.Drawing.Font font = new System.Drawing.Font("맑은 고딕", fontSize, FontStyle.Bold))
                     using (Brush brush = new SolidBrush(Color.Gray))
                     using (StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
                     {
                         g.DrawString(text, font, brush, pbSpin.ClientRectangle, sf);
+                        text = null;
+                        font.Dispose();
+                        brush.Dispose();
+                        sf.Dispose();
                     }
                 }
             }
             catch (Exception ex)
             {
-                LogError("[REMAINSECONDS] " + ex);
+                LogWrite("[REMAINSECONDS] " + ex);
                 try { File.AppendAllText("error.log", $"{DateTime.Now}: RemainSeconds: {ex}\n"); } catch { }
             }
         }
@@ -705,7 +749,7 @@ namespace Roulette
             }
             catch (Exception ex)
             {
-                LogError("[GETCURRENTSELECTEDNAME] " + ex);
+                LogWrite("[GETCURRENTSELECTEDNAME] " + ex);
                 return "";
             }
         }
@@ -728,7 +772,7 @@ namespace Roulette
                             break;
                         }
                     }
-                    catch (Exception ex) { LogError("[PROCESSROULETTERESULT-MEMBERROW] " + ex); }
+                    catch (Exception ex) { LogWrite("[PROCESSROULETTERESULT-MEMBERROW] " + ex); }
                 }
                 await SaveMembersToCsv();
 
@@ -745,11 +789,11 @@ namespace Roulette
                             break;
                         }
                     }
-                    catch (Exception ex) { LogError("[PROCESSROULETTERESULT-GIFTROW] " + ex); }
+                    catch (Exception ex) { LogWrite("[PROCESSROULETTERESULT-GIFTROW] " + ex); }
                 }
                 await SaveGiftsToCsv();
             }
-            catch (Exception ex) { LogError("[PROCESSROULETTERESULT] " + ex); }
+            catch (Exception ex) { LogWrite("[PROCESSROULETTERESULT] " + ex); }
         }
 
         // 멤버 정보를 CSV로 저장
@@ -767,7 +811,7 @@ namespace Roulette
                         string result = row.Cells["mResultColumn"].Value?.ToString() ?? "";
                         lines.Add($"{name},{result}");
                     }
-                    catch (Exception ex) { LogError("[SAVEMEMBERSCSV-ROW] " + ex); }
+                    catch (Exception ex) { LogWrite("[SAVEMEMBERSCSV-ROW] " + ex); }
                 }
 
                 try
@@ -782,7 +826,7 @@ namespace Roulette
                 }
                 catch (Exception ex)
                 {
-                    LogError("[SAVEMEMBERSCSV-WRITE] " + ex);
+                    LogWrite("[SAVEMEMBERSCSV-WRITE] " + ex);
                     if (SynchronizationContext.Current == null)
                         SynchronizationContext.SetSynchronizationContext(new WindowsFormsSynchronizationContext());
                     await Task.Factory.StartNew(() =>
@@ -791,7 +835,7 @@ namespace Roulette
                     }, CancellationToken.None, TaskCreationOptions.None, TaskScheduler.FromCurrentSynchronizationContext());
                 }
             }
-            catch (Exception ex) { LogError("[SAVEMEMBERSCSV] " + ex); }
+            catch (Exception ex) { LogWrite("[SAVEMEMBERSCSV] " + ex); }
         }
 
         // 선물 정보를 CSV로 저장
@@ -809,7 +853,7 @@ namespace Roulette
                         string member = row.Cells["gMemberColumn"].Value?.ToString() ?? "";
                         lines.Add($"{gift},{member}");
                     }
-                    catch (Exception ex) { LogError("[SAVEGIFTSCSV-ROW] " + ex); }
+                    catch (Exception ex) { LogWrite("[SAVEGIFTSCSV-ROW] " + ex); }
                 }
 
                 try
@@ -824,7 +868,7 @@ namespace Roulette
                 }
                 catch (Exception ex)
                 {
-                    LogError("[SAVEGIFTSCSV-WRITE] " + ex);
+                    LogWrite("[SAVEGIFTSCSV-WRITE] " + ex);
                     if (SynchronizationContext.Current == null)
                         SynchronizationContext.SetSynchronizationContext(new WindowsFormsSynchronizationContext());
                     await Task.Factory.StartNew(() =>
@@ -833,16 +877,16 @@ namespace Roulette
                     }, CancellationToken.None, TaskCreationOptions.None, TaskScheduler.FromCurrentSynchronizationContext());
                 }
             }
-            catch (Exception ex) { LogError("[SAVEGIFTSCSV] " + ex); }
+            catch (Exception ex) { LogWrite("[SAVEGIFTSCSV] " + ex); }
         }
 
         // 폼 크기 변경 시 회전판/버튼 재배치
         private void Roulette_Resize(object sender, EventArgs e)
         {
-            try { RedrawWheel(); } catch (Exception ex) { LogError("[RESIZE] " + ex); }
+            try { RedrawWheel(); } catch (Exception ex) { LogWrite("[RESIZE] " + ex); }
         }
 
-        // 멤버 추가 버튼 클릭 시 멤버 추가
+        // 멤버 추가 버튼 클릭
         private void btnAddMembers_Click(object sender, EventArgs e)
         {
             try // [ADDMEMBER]
@@ -859,17 +903,17 @@ namespace Roulette
                         nameList.Add(name);
                         remainingNames.Add(name);
                     }
-                    catch (Exception ex) { LogError("[ADDMEMBER-DGV] " + ex); MessageBox.Show("멤버 추가 중 오류가 발생했습니다.\n" + ex.Message, "오류", MessageBoxButtons.OK, MessageBoxIcon.Error); }
+                    catch (Exception ex) { LogWrite("[ADDMEMBER-DGV] " + ex); MessageBox.Show("멤버 추가 중 오류가 발생했습니다.\n" + ex.Message, "오류", MessageBoxButtons.OK, MessageBoxIcon.Error); }
 
-                    try { txtAddMembers.Clear(); } catch (Exception ex) { LogError("[ADDMEMBER-TXTCLR] " + ex); }
-                    try { _ = SaveMembersToCsv(); } catch (Exception ex) { LogError("[ADDMEMBER-SAVECSV] " + ex); }
-                    try { RedrawWheel(); } catch (Exception ex) { LogError("[ADDMEMBER-REDRAW] " + ex); }
+                    try { txtAddMembers.Clear(); } catch (Exception ex) { LogWrite("[ADDMEMBER-TXTCLR] " + ex); }
+                    try { _ = SaveMembersToCsv(); } catch (Exception ex) { LogWrite("[ADDMEMBER-SAVECSV] " + ex); }
+                    try { RedrawWheel(); } catch (Exception ex) { LogWrite("[ADDMEMBER-REDRAW] " + ex); }
                 }
             }
-            catch (Exception ex) { LogError("[ADDMEMBER] " + ex); MessageBox.Show("멤버 추가 처리 중 예기치 못한 오류가 발생했습니다.\n" + ex.Message, "오류", MessageBoxButtons.OK, MessageBoxIcon.Error); }
+            catch (Exception ex) { LogWrite("[ADDMEMBER] " + ex); MessageBox.Show("멤버 추가 처리 중 예기치 못한 오류가 발생했습니다.\n" + ex.Message, "오류", MessageBoxButtons.OK, MessageBoxIcon.Error); }
         }
 
-        // 선물 추가 버튼 클릭 시 선물 추가
+        // 선물 추가 버튼 클릭
         private void btnAddGifts_Click(object sender, EventArgs e)
         {
             try // [ADDGIFT]
@@ -887,7 +931,7 @@ namespace Roulette
                         }
                     }
                 }
-                catch (Exception ex) { LogError("[ADDGIFT-CHECKDUP] " + ex); }
+                catch (Exception ex) { LogWrite("[ADDGIFT-CHECKDUP] " + ex); }
 
                 if (!string.IsNullOrEmpty(gift) && !exists)
                 {
@@ -898,61 +942,66 @@ namespace Roulette
                         dgvGifts.Rows[rowIndex].Cells["gGiftColumn"].Value = gift;
                         dgvGifts.Rows[rowIndex].Cells["gMemberColumn"].Value = "";
                     }
-                    catch (Exception ex) { LogError("[ADDGIFT-DGV] " + ex); MessageBox.Show("선물 추가 중 오류가 발생했습니다.\n" + ex.Message, "오류", MessageBoxButtons.OK, MessageBoxIcon.Error); }
+                    catch (Exception ex) { LogWrite("[ADDGIFT-DGV] " + ex); MessageBox.Show("선물 추가 중 오류가 발생했습니다.\n" + ex.Message, "오류", MessageBoxButtons.OK, MessageBoxIcon.Error); }
 
-                    try { txtAddGifts.Clear(); } catch (Exception ex) { LogError("[ADDGIFT-TXTCLR] " + ex); }
-                    try { _ = SaveGiftsToCsv(); } catch (Exception ex) { LogError("[ADDGIFT-SAVECSV] " + ex); }
+                    try { txtAddGifts.Clear(); } catch (Exception ex) { LogWrite("[ADDGIFT-TXTCLR] " + ex); }
+                    try { _ = SaveGiftsToCsv(); } catch (Exception ex) { LogWrite("[ADDGIFT-SAVECSV] " + ex); }
                 }
             }
-            catch (Exception ex) { LogError("[ADDGIFT] " + ex); MessageBox.Show("선물 추가 처리 중 예기치 못한 오류가 발생했습니다.\n" + ex.Message, "오류", MessageBoxButtons.OK, MessageBoxIcon.Error); }
+            catch (Exception ex) { LogWrite("[ADDGIFT] " + ex); MessageBox.Show("선물 추가 처리 중 예기치 못한 오류가 발생했습니다.\n" + ex.Message, "오류", MessageBoxButtons.OK, MessageBoxIcon.Error); }
         }
 
-        // SPIN 버튼에 마우스 올리면 이미지 변경
+        // SPIN 버튼에 커서를 올리면 이미지 변경
         private void pbSpin_MouseHover(object sender, EventArgs e)
         {
             try // [SPINHOVER]
             {
                 if (!spinning)
                 {
-                    pbSpin.BackgroundImage = btnSpin2Image;
                     winnerName = null;
+                    pbSpin.BackgroundImage = null;
+                    pbSpin.BackgroundImage = btnSpin2Image;
                 }
             }
-            catch (Exception ex) { LogError("[SPINHOVER] " + ex); }
+            catch (Exception ex) { LogWrite("[SPINHOVER] " + ex); }
         }
-        // SPIN 버튼에서 마우스 떼면 이미지 원래대로
+        // 커서가 SPIN 버튼에서 벗어나면 이미지 원래대로
         private void pbSpin_MouseLeave(object sender, EventArgs e)
         {
             try // [SPINLEAVE]
             {
                 if (!spinning)
                 {
-                    pbSpin.BackgroundImage = btnSpinImage;
                     winnerName = null;
+                    pbSpin.BackgroundImage = null;
+                    pbSpin.BackgroundImage = btnSpinImage;
                 }
             }
-            catch (Exception ex) { LogError("[SPINLEAVE] " + ex); }
+            catch (Exception ex) { LogWrite("[SPINLEAVE] " + ex); }
         }
 
-        // 에러 로그 파일 기록
-        private void LogError(string message)
+        // 에러 로그 기록
+        private void LogWrite(string message)
         {
-            try
-            {
-                File.AppendAllText("error.log", $"\n\n\n{DateTime.Now}: {message}\n");
-            }
-            catch (Exception) { /* 로그 기록 실패시 재귀 방지 */ }
+            try { Task.Run(() => { try { lock (logLock) { File.AppendAllText("Roulette.log", $"\n{DateTime.Now}: {message}\n"); } } catch (Exception) { /* 로그 기록 실패시 재귀 방지 */ } }); } catch (Exception) { /* 로그 기록 실패시 재귀 방지 */ }
         }
 
-        // 종료 버튼 클릭 시 프로그램 종료
+        // 프로그램 종료
         private void btnExit_Click(object sender, EventArgs e)
         {
             try // [EXIT]
             {
+                LogWrite("[Application Exit] ");
+
                 this.Close();
                 this.Dispose();
             }
-            catch (Exception ex) { LogError("[EXIT] " + ex); }
+            catch (Exception ex) { LogWrite("[EXIT] " + ex); }
+        }
+
+        private void Roulette_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            LogWrite("[Application Close] ");
         }
     }
 }

@@ -1,4 +1,5 @@
 using System.IO;
+using System.Media;
 
 namespace Roulette
 {
@@ -23,6 +24,7 @@ namespace Roulette
                 soundResultStream?.Dispose();
                 SoundSpin?.Dispose();
                 SoundResult?.Dispose();
+                pbWheel.Image?.Dispose();
 
                 components?.Dispose();
             }
@@ -267,6 +269,7 @@ namespace Roulette
             MinimumSize = new System.Drawing.Size(800, 430);
             Name = "Roulette";
             Text = "Roulette Wheel";
+            FormClosing += Roulette_FormClosing;
             Resize += Roulette_Resize;
             ((System.ComponentModel.ISupportInitialize)pbWheel).EndInit();
             ((System.ComponentModel.ISupportInitialize)dgvMembers).EndInit();
