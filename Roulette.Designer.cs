@@ -111,6 +111,9 @@ namespace Roulette
             dgvMembers.RowHeadersVisible = false;
             dgvMembers.Size = new System.Drawing.Size(191, 323);
             dgvMembers.TabIndex = 4;
+            dgvMembers.CellBeginEdit += dgvMembers_CellBeginEdit;
+            dgvMembers.CellValueChanged += dgvMembers_CellValueChanged;
+            dgvMembers.KeyDown += dgvMembers_PasteAndDelete;
             // 
             // mMemberColumn
             // 
@@ -137,6 +140,9 @@ namespace Roulette
             dgvGifts.RowHeadersVisible = false;
             dgvGifts.Size = new System.Drawing.Size(191, 323);
             dgvGifts.TabIndex = 5;
+            dgvGifts.CellBeginEdit += dgvGifts_CellBeginEdit;
+            dgvGifts.CellValueChanged += dgvGifts_CellValueChanged;
+            dgvGifts.KeyDown += dgvGifts_PasteAndDelete;
             // 
             // gGiftColumn
             // 
