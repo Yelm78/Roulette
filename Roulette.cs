@@ -1327,7 +1327,8 @@ namespace Roulette
                         }
                         _ = SaveMembersToCsv();
                         _ = SaveGiftsToCsv();
-                        LogWrite($"ModifyAssignedMember: {oldMember} -> {newMember}");
+                        if (!spinning && !isLoading)
+                            LogWrite($"ModifyAssignedMember: {oldMember} -> {newMember}");
                     }
                 }
                 isLoading = false;
