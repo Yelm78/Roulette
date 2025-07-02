@@ -114,7 +114,7 @@ namespace Roulette
             dgvMembers.TabIndex = 4;
             dgvMembers.CellBeginEdit += dgvMembers_CellBeginEdit;
             dgvMembers.CellValueChanged += dgvMembers_CellValueChanged;
-            dgvMembers.KeyDown += dgvMembers_PasteAndDelete;
+            dgvMembers.KeyDown += dgvMembers_PasteAndDelete;            
             // 
             // mMemberColumn
             // 
@@ -129,6 +129,7 @@ namespace Roulette
             mResultColumn.FillWeight = 88.0622559F;
             mResultColumn.HeaderText = "Result";
             mResultColumn.Name = "mResultColumn";
+            dgvMembers.Columns["mResultColumn"].ReadOnly = true;
             // 
             // dgvGifts
             // 

@@ -29,6 +29,7 @@ namespace Roulette
         private static Task logTask;
 
         private bool isLoading = false;
+        private string prevAssignedMemberName = "";
 
         // 멤버, 남은 멤버, 당첨 멤버 리스트
         private List<string> nameList = new List<string>();
@@ -223,7 +224,7 @@ namespace Roulette
                     try
                     {
                         nameList.Clear();
-                        remainingNames.Clear();
+                        //remainingNames.Clear(); // 기존 코드 주석 처리
                         selectedNames.Clear();
 
                         // DataGridView 업데이트 최적화
@@ -249,8 +250,8 @@ namespace Roulette
 
                                     if (!string.IsNullOrEmpty(result))
                                         selectedNames.Add(name);
-                                    else
-                                        remainingNames.Add(name);
+                                    //else
+                                    //    remainingNames.Add(name); // 기존 코드 주석 처리
                                 }
                             }
                             catch (Exception ex) { LogWrite("[LOADCSV-UIUPDATE-MEMBERROW] " + ex); }
@@ -264,6 +265,7 @@ namespace Roulette
                                 string gift = parts[0].Trim();
                                 gift = gift.Replace("\"", ""); // 따옴표 제거
                                 string member = parts.Length > 1 ? parts[1].Trim() : "";
+                                // gift(선물명)이 비어있지 않은 경우에만 행 추가
                                 if (!string.IsNullOrEmpty(gift))
                                 {
                                     int rowIndex = dgvGifts.Rows.Add();
@@ -275,6 +277,15 @@ namespace Roulette
                         }
                         dgvMembers.ResumeLayout();
                         dgvGifts.ResumeLayout();
+
+                        // CSV 로드 후 remainingNames 재구성
+                        remainingNames = dgvMembers.Rows
+                            .Cast<DataGridViewRow>()
+                            .Where(row => !row.IsNewRow)
+                            .Select(row => row.Cells["mMemberColumn"].Value?.ToString()?.Trim())
+                            .Where(n => !string.IsNullOrEmpty(n))
+                            .Except(selectedNames)
+                            .ToList();
                     }
                     catch (Exception ex) { LogWrite("[LOADCSV-UIUPDATE-CLEAR] " + ex); }
                 }, CancellationToken.None, TaskCreationOptions.None, TaskScheduler.FromCurrentSynchronizationContext());
@@ -282,6 +293,11 @@ namespace Roulette
             catch (Exception ex) { LogWrite("[LOADCSV-UIUPDATE] " + ex); }
 
             isLoading = false; // 로딩 끝
+
+            // 동기화 보정
+            SyncGiftMemberWithResult();
+            await SaveGiftsToCsv();
+            await SaveMembersToCsv();
 
             try { await Task.Run(() => RedrawWheel()); } catch (Exception ex) { LogWrite("[LOADCSV-REDRAWWHEEL] " + ex); }
         }
@@ -341,6 +357,7 @@ namespace Roulette
                     pbWheel.Invoke(new Action(() =>
                     {
                         pbWheel.Image = newImage;
+                        cachedWheelImage = newImage;
                         UpdatePbSpinBackColor();
                         CenterSpinButton();
                     }));
@@ -348,6 +365,7 @@ namespace Roulette
                 else
                 {
                     pbWheel.Image = newImage;
+                    cachedWheelImage = newImage;
                     UpdatePbSpinBackColor();
                     CenterSpinButton();
                 }
@@ -360,7 +378,33 @@ namespace Roulette
         {
             try // [DRAWWHEELIMAGE]
             {
-                if (remainingNames.Count == 0)
+                // 남은 멤버 리스트를 복사해서 사용 (동시성 문제 및 인덱스 오류 방지)
+                var names = remainingNames.ToList();
+
+                // [추가] 멤버와 선물이 모두 없는 경우 안내 메시지 출력
+                bool noMembers = dgvMembers.Rows.Cast<DataGridViewRow>().All(r => r.IsNewRow || string.IsNullOrWhiteSpace(r.Cells["mMemberColumn"].Value?.ToString()));
+                bool noGifts = dgvGifts.Rows.Cast<DataGridViewRow>().All(r => r.IsNewRow || string.IsNullOrWhiteSpace(r.Cells["gGiftColumn"].Value?.ToString()));
+
+                if (noMembers && noGifts)
+                {
+                    int width = Math.Max(1, pbWheel.Width);
+                    int height = Math.Max(1, pbWheel.Height);
+                    Bitmap b = new(width, height);
+                    using (Graphics g = Graphics.FromImage(b))
+                    {
+                        g.Clear(System.Drawing.SystemColors.Control);
+                        string msg = "\n\n\n\n\n멤버와 선물을 추가하세요!\n⇒⇒⇒⇒⇒⇒⇒⇒⇒⇒";
+                        using (System.Drawing.Font font = new System.Drawing.Font("맑은 고딕", Math.Max(12, width / 18f), FontStyle.Bold))
+                        using (Brush brush = new SolidBrush(Color.Gray))
+                        using (StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
+                        {
+                            g.DrawString(msg, font, brush, new RectangleF(0, 0, width, height), sf);
+                        }
+                    }
+                    return b;
+                }
+
+                if (names.Count == 0)
                 {
                     return new Bitmap(Math.Max(1, pbWheel.Width), Math.Max(1, pbWheel.Height));
                 }
@@ -379,18 +423,18 @@ namespace Roulette
                     using (Graphics g = Graphics.FromImage(bmp))
                     {
                         g.SmoothingMode = SmoothingMode.AntiAlias;
-                        float sectionAngle = 360f / Math.Max(1, remainingNames.Count); // 남은 멤버 수만큼 섹션을 균등 분할
+                        float sectionAngle = 360f / Math.Max(1, names.Count); // 남은 멤버 수만큼 섹션을 균등 분할
                         float angleStart = currentAngle;
 
                         List<Brush> pastelBrushes = new List<Brush>();
-                        for (int i = 0; i < remainingNames.Count; i++)
+                        for (int i = 0; i < names.Count; i++)
                         {
                             // 각 섹션마다 파스텔톤 색상 브러시 생성
                             try { pastelBrushes.Add(new SolidBrush(GetRandomPastelColor())); }
                             catch (Exception ex) { LogWrite("[DRAWWHEELIMAGE-COLOR] " + ex); }
                         }
 
-                        int count = Math.Min(remainingNames.Count, pastelBrushes.Count);
+                        int count = names.Count;
                         for (int i = 0; i < count; i++)
                         {
                             // 각 멤버 이름을 섹션에 그림
@@ -415,7 +459,7 @@ namespace Roulette
                                 float minFont = 5f * scale;
                                 float maxFont = 12f * scale;
                                 float fontSize = maxFont;
-                                string text = remainingNames[i];
+                                string text = names[i];
                                 SizeF textSize;
 
                                 using (System.Drawing.Font testFont = new System.Drawing.Font("맑은 고딕", fontSize, FontStyle.Bold))
@@ -863,10 +907,19 @@ namespace Roulette
         }
 
         // 당첨 결과 처리 및 저장
+        /// <summary>
+        /// 당첨 결과 처리 및 저장
+        /// - 당첨 멤버의 Result(순번)를 먼저 1로 설정
+        /// - 첫번째 비어있는 gMemberColumn이면서 gGiftColumn이 비어있지 않은 선물에만 멤버를 할당
+        /// - 만약 선물 할당이 실패하면, 해당 멤버의 Result(1)도 리셋(공백) 처리
+        /// - remainingNames는 DataGridView에서 새로 구성 (빈 값, 중복 제거)
+        /// </summary>
         private async void ProcessRouletteResult(string selectedMember, int order)
         {
             try // [PROCESSROULETTERESULT]
             {
+                int memberRowIndex = -1;
+                // 당첨 멤버의 Result(순번) 설정
                 for (int i = 0; i < dgvMembers.Rows.Count; i++)
                 {
                     try
@@ -877,6 +930,7 @@ namespace Roulette
                             dgvMembers.ClearSelection();
                             dgvMembers.Rows[i].Selected = true;
                             dgvMembers.CurrentCell = dgvMembers.Rows[i].Cells["mMemberColumn"];
+                            memberRowIndex = i;
                             break;
                         }
                     }
@@ -884,22 +938,49 @@ namespace Roulette
                 }
                 await SaveMembersToCsv();
 
+                // 첫번째 비어있는 gMemberColumn이면서 gGiftColumn이 비어있지 않은 행에만 멤버 할당
+                bool giftAssigned = false;
                 for (int i = 0; i < dgvGifts.Rows.Count; i++)
                 {
                     try
                     {
-                        if (string.IsNullOrEmpty(dgvGifts.Rows[i].Cells["gMemberColumn"].Value?.ToString()))
+                        var giftCell = dgvGifts.Rows[i].Cells["gGiftColumn"].Value?.ToString();
+                        var memberCell = dgvGifts.Rows[i].Cells["gMemberColumn"].Value?.ToString();
+                        if (!string.IsNullOrWhiteSpace(giftCell) && string.IsNullOrEmpty(memberCell))
                         {
                             dgvGifts.Rows[i].Cells["gMemberColumn"].Value = selectedMember;
                             dgvGifts.ClearSelection();
                             dgvGifts.Rows[i].Selected = true;
                             dgvGifts.CurrentCell = dgvGifts.Rows[i].Cells["gGiftColumn"];
+                            giftAssigned = true;
                             break;
                         }
                     }
                     catch (Exception ex) { LogWrite("[PROCESSROULETTERESULT-GIFTROW] " + ex); }
                 }
                 await SaveGiftsToCsv();
+
+                // 만약 선물 할당이 안 됐다면, 멤버의 Result(1)도 리셋
+                if (!giftAssigned && memberRowIndex >= 0)
+                {
+                    dgvMembers.Rows[memberRowIndex].Cells["mResultColumn"].Value = "";
+                    await SaveMembersToCsv();
+                }
+
+                // 기존: remainingNames.Remove(result);
+                // remainingNames를 DataGridView에서 새로 구성 (빈 값, 중복 제거)
+                remainingNames = dgvMembers.Rows
+                    .Cast<DataGridViewRow>()
+                    .Where(row => !row.IsNewRow)
+                    .Select(row => row.Cells["mMemberColumn"].Value?.ToString()?.Trim())
+                    .Where(name => !string.IsNullOrEmpty(name))
+                    .Except(selectedNames)
+                    .ToList();
+
+                //// 동기화 보정
+                //SyncGiftMemberWithResult();
+                //await SaveGiftsToCsv();
+                //await SaveMembersToCsv();
             }
             catch (Exception ex) { LogWrite("[PROCESSROULETTERESULT] " + ex); }
         }
@@ -1034,18 +1115,34 @@ namespace Roulette
                     int rowIndex = -1;
                     try
                     {
+                        isLoading = true; // CellValueChanged에서 로그 남기지 않도록
                         rowIndex = dgvMembers.Rows.Add();
                         dgvMembers.Rows[rowIndex].Cells["mMemberColumn"].Value = name;
                         dgvMembers.Rows[rowIndex].Cells["mResultColumn"].Value = "";
                         nameList.Add(name);
-                        remainingNames.Add(name);
+                        //remainingNames.Add(name); // 기존 코드 주석 처리
                         LogWrite("AddMember: " + name);
                     }
                     catch (Exception ex) { LogWrite("[ADDMEMBER-DGV] " + ex); MessageBox.Show("멤버 추가 중 오류가 발생했습니다.\n" + ex.Message, "오류", MessageBoxButtons.OK, MessageBoxIcon.Error); }
+                    finally
+                    {
+                        isLoading = false; // 플래그 해제
+                    }
 
                     try { txtAddMembers.Clear(); } catch (Exception ex) { LogWrite("[ADDMEMBER-TXTCLR] " + ex); }
                     try { _ = SaveMembersToCsv(); } catch (Exception ex) { LogWrite("[ADDMEMBER-SAVECSV] " + ex); }
-                    try { RedrawWheel(); } catch (Exception ex) { LogWrite("[ADDMEMBER-REDRAW] " + ex); }
+                    //try { RedrawWheel(); } catch (Exception ex) { LogWrite("[ADDMEMBER-REDRAW] " + ex); }
+
+                    // remainingNames를 DataGridView에서 새로 구성
+                    remainingNames = dgvMembers.Rows
+                        .Cast<DataGridViewRow>()
+                        .Where(row => !row.IsNewRow)
+                        .Select(row => row.Cells["mMemberColumn"].Value?.ToString()?.Trim())
+                        .Where(n => !string.IsNullOrEmpty(n))
+                        .Except(selectedNames)
+                        .ToList();
+
+                    RedrawWheel();
                 }
             }
             catch (Exception ex) { LogWrite("[ADDMEMBER] " + ex); MessageBox.Show("멤버 추가 처리 중 예기치 못한 오류가 발생했습니다.\n" + ex.Message, "오류", MessageBoxButtons.OK, MessageBoxIcon.Error); }
@@ -1064,7 +1161,7 @@ namespace Roulette
                     {
                         if ((row.Cells["gGiftColumn"].Value?.ToString() ?? "") == gift)
                         {
-                            exists = true;
+                            //exists = true; // 중복 체크는 하지 않음, 사용자가 중복을 허용할 수 있음
                             break;
                         }
                     }
@@ -1076,12 +1173,17 @@ namespace Roulette
                     int rowIndex = -1;
                     try
                     {
+                        isLoading = true; // CellValueChanged에서 로그 남기지 않도록
                         rowIndex = dgvGifts.Rows.Add();
                         dgvGifts.Rows[rowIndex].Cells["gGiftColumn"].Value = gift;
                         dgvGifts.Rows[rowIndex].Cells["gMemberColumn"].Value = "";
                         LogWrite("AddGift: " + gift);
                     }
                     catch (Exception ex) { LogWrite("[ADDGIFT-DGV] " + ex); MessageBox.Show("선물 추가 중 오류가 발생했습니다.\n" + ex.Message, "오류", MessageBoxButtons.OK, MessageBoxIcon.Error); }
+                    finally
+                    {
+                        isLoading = false; // 플래그 해제
+                    }
 
                     try { txtAddGifts.Clear(); } catch (Exception ex) { LogWrite("[ADDGIFT-TXTCLR] " + ex); }
                     try { _ = SaveGiftsToCsv(); } catch (Exception ex) { LogWrite("[ADDGIFT-SAVECSV] " + ex); }
@@ -1101,6 +1203,17 @@ namespace Roulette
         {
             if (dgvGifts.Columns[e.ColumnIndex].Name == "gGiftColumn")
                 prevGiftName = dgvGifts.Rows[e.RowIndex].Cells[e.ColumnIndex].Value?.ToString() ?? "";
+            else if (dgvGifts.Columns[e.ColumnIndex].Name == "gMemberColumn")
+            {
+                prevAssignedMemberName = dgvGifts.Rows[e.RowIndex].Cells[e.ColumnIndex].Value?.ToString() ?? "";
+
+                // 아직 당첨자가 할당되지 않은 경우(값이 비어있음) 편집 막기
+                if (string.IsNullOrEmpty(prevAssignedMemberName))
+                {
+                    //MessageBox.Show("아직 당첨자가 할당되지 않은 선물은 멤버를 입력/수정할 수 없습니다.", "편집 불가", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    e.Cancel = true;
+                }
+            }
         }
         private void dgvMembers_CellValueChanged(object sender, DataGridViewCellEventArgs e)
         {
@@ -1129,10 +1242,43 @@ namespace Roulette
                         }
                         if (prevMemberName != newValue)
                         {
+                            // nameList 갱신
+                            int idx = nameList.IndexOf(prevMemberName);
+                            if (idx >= 0) nameList[idx] = newValue;
+
+                            // remainingNames 갱신
+                            int idx2 = remainingNames.IndexOf(prevMemberName);
+                            if (idx2 >= 0) remainingNames[idx2] = newValue;
+
+                            // selectedNames 갱신
+                            int idx3 = selectedNames.IndexOf(prevMemberName);
+                            if (idx3 >= 0) selectedNames[idx3] = newValue;
+
+                            // [추가] 선물에 배정된 이름도 함께 변경
+                            foreach (DataGridViewRow row in dgvGifts.Rows)
+                            {
+                                if (row.IsNewRow) continue;
+                                if ((row.Cells["gMemberColumn"].Value?.ToString() ?? "") == prevMemberName)
+                                {
+                                    row.Cells["gMemberColumn"].Value = newValue;
+                                }
+                            }
+
+                            // CSV 저장
+                            _ = SaveMembersToCsv();
+                            _ = SaveGiftsToCsv();
+
                             LogWrite($"ModifyMember: {prevMemberName} -> {newValue}");
                         }
                     }
                 }
+                isLoading = false;
+
+                //// 동기화 보정
+                //SyncGiftMemberWithResult();
+                //_ = SaveGiftsToCsv();
+                //_ = SaveMembersToCsv();
+
                 RedrawWheel();
             }
             catch (Exception ex) { LogWrite("[MEMBERS-CELLVALUECHANGED] " + ex); }
@@ -1143,31 +1289,54 @@ namespace Roulette
 
             try
             {
-                // gGiftColumn(선물명) 컬럼만 체크
+                // 선물명 변경 처리
                 if (dgvGifts.Columns[e.ColumnIndex].Name == "gGiftColumn")
                 {
                     string newValue = dgvGifts.Rows[e.RowIndex].Cells[e.ColumnIndex].Value?.ToString() ?? "";
-                    if (!string.IsNullOrWhiteSpace(newValue))
+                    if (!string.IsNullOrWhiteSpace(newValue) && prevGiftName != newValue)
                     {
-                        int count = 0;
-                        foreach (DataGridViewRow row in dgvGifts.Rows)
-                        {
-                            if (row.IsNewRow) continue;
-                            if ((row.Cells["gGiftColumn"].Value?.ToString() ?? "") == newValue)
-                                count++;
-                        }
-                        //if (count > 1)
-                        //{
-                        //    MessageBox.Show("이미 존재하는 선물명입니다.", "중복 경고", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                        //    dgvGifts.Rows[e.RowIndex].Cells[e.ColumnIndex].Value = prevGiftName; // 중복이면 이전 값으로 되돌림
-                        //    return;
-                        //}
-                        if (prevGiftName != newValue)
-                        {
-                            LogWrite($"ModifyGift: {prevGiftName} -> {newValue}");
-                        }
+                        _ = SaveGiftsToCsv();
+                        LogWrite($"ModifyGift: {prevGiftName} -> {newValue}");
                     }
                 }
+
+                // 할당 멤버명 변경 처리 (항상 분리해서 동작)
+                if (dgvGifts.Columns[e.ColumnIndex].Name == "gMemberColumn")
+                {
+                    string oldMember = prevAssignedMemberName;
+                    string newMember = dgvGifts.Rows[e.RowIndex].Cells[e.ColumnIndex].Value?.ToString() ?? "";
+
+                    if (string.IsNullOrWhiteSpace(newMember) && !string.IsNullOrWhiteSpace(oldMember))
+                    {
+                        //MessageBox.Show("이미 할당된 멤버는 빈 값으로 변경할 수 없습니다.", "수정 불가", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        dgvGifts.Rows[e.RowIndex].Cells[e.ColumnIndex].Value = oldMember;
+                        return;
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(newMember) && oldMember != newMember)
+                    {
+                        foreach (DataGridViewRow row in dgvMembers.Rows)
+                        {
+                            if (row.IsNewRow) continue;
+                            // mResultColumn(당첨 결과)이 비어있지 않은(즉, 당첨된) 멤버만 변경
+                            var result = row.Cells["mResultColumn"].Value?.ToString();
+                            if (!string.IsNullOrEmpty(result) && (row.Cells["mMemberColumn"].Value?.ToString() ?? "") == oldMember)
+                            {
+                                row.Cells["mMemberColumn"].Value = newMember;
+                            }
+                        }
+                        _ = SaveMembersToCsv();
+                        _ = SaveGiftsToCsv();
+                        LogWrite($"ModifyAssignedMember: {oldMember} -> {newMember}");
+                    }
+                }
+                isLoading = false;
+
+                //// 동기화 보정
+                //SyncGiftMemberWithResult();
+                //_ = SaveGiftsToCsv();
+                //_ = SaveMembersToCsv();
+
                 RedrawWheel();
             }
             catch (Exception ex) { LogWrite("[GIFTS-CELLVALUECHANGED] " + ex); }
@@ -1194,11 +1363,21 @@ namespace Roulette
                                 dgvMembers.Rows[rowIndex].Cells["mMemberColumn"].Value = name;
                                 dgvMembers.Rows[rowIndex].Cells["mResultColumn"].Value = "";
                                 nameList.Add(name);
-                                remainingNames.Add(name);
+                                //remainingNames.Add(name); // 기존 코드 주석 처리
                                 LogWrite("AddMember(Paste): " + name);
                             }
                         }
                         _ = SaveMembersToCsv();
+
+                        // 붙여넣기 후 remainingNames 재구성
+                        remainingNames = dgvMembers.Rows
+                            .Cast<DataGridViewRow>()
+                            .Where(row => !row.IsNewRow)
+                            .Select(row => row.Cells["mMemberColumn"].Value?.ToString()?.Trim())
+                            .Where(n => !string.IsNullOrEmpty(n))
+                            .Except(selectedNames)
+                            .ToList();
+
                         RedrawWheel();
                     }
 
@@ -1225,6 +1404,20 @@ namespace Roulette
 
                 if (rowIndexes.Count > 0)
                 {
+                    // 삭제 불가 체크: mResultColumn에 값이 있는 경우
+                    foreach (var rowIndex in rowIndexes)
+                    {
+                        if (!dgvMembers.Rows[rowIndex].IsNewRow)
+                        {
+                            var result = dgvMembers.Rows[rowIndex].Cells["mResultColumn"].Value?.ToString();
+                            if (!string.IsNullOrEmpty(result))
+                            {
+                                MessageBox.Show("이미 결과가 있는 멤버는 삭제할 수 없습니다.", "삭제 불가", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                                e.Handled = true;
+                                return;
+                            }
+                        }
+                    }
                     var result1 = MessageBox.Show("정말 삭제하시겠습니까?", "삭제 확인", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
                     if (result1 == DialogResult.Yes)
                     {
@@ -1236,17 +1429,24 @@ namespace Roulette
                                 if (!dgvMembers.Rows[rowIndex].IsNewRow)
                                 {
                                     string name = dgvMembers.Rows[rowIndex].Cells["mMemberColumn"].Value?.ToString() ?? "";
-                                    //nameList.Remove(name);
-                                    //remainingNames.Remove(name);
-                                    //selectedNames.Remove(name);
                                     nameList.RemoveAll(n => n.Equals(name, StringComparison.OrdinalIgnoreCase));
-                                    remainingNames.RemoveAll(n => n.Equals(name, StringComparison.OrdinalIgnoreCase));
+                                    //remainingNames.RemoveAll(n => n.Equals(name, StringComparison.OrdinalIgnoreCase)); // 기존 코드 주석 처리
                                     selectedNames.RemoveAll(n => n.Equals(name, StringComparison.OrdinalIgnoreCase));
                                     LogWrite("DeleteMember: " + name);
                                     dgvMembers.Rows.RemoveAt(rowIndex);
                                 }
                             }
                             _ = SaveMembersToCsv();
+
+                            // 삭제 후 remainingNames 재구성
+                            remainingNames = dgvMembers.Rows
+                                .Cast<DataGridViewRow>()
+                                .Where(row => !row.IsNewRow)
+                                .Select(row => row.Cells["mMemberColumn"].Value?.ToString()?.Trim())
+                                .Where(n => !string.IsNullOrEmpty(n))
+                                .Except(selectedNames)
+                                .ToList();
+
                             RedrawWheel();
                         }
                     }
@@ -1304,6 +1504,20 @@ namespace Roulette
 
                 if (rowIndexes.Count > 0)
                 {
+                    // 삭제 불가 체크: gMemberColumn에 값이 있는 경우
+                    foreach (var rowIndex in rowIndexes)
+                    {
+                        if (!dgvGifts.Rows[rowIndex].IsNewRow)
+                        {
+                            var member = dgvGifts.Rows[rowIndex].Cells["gMemberColumn"].Value?.ToString();
+                            if (!string.IsNullOrEmpty(member))
+                            {
+                                MessageBox.Show("이미 결과가 있는 선물은 삭제할 수 없습니다.", "삭제 불가", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                                e.Handled = true;
+                                return;
+                            }
+                        }
+                    }
                     var result1 = MessageBox.Show("정말 삭제하시겠습니까?", "삭제 확인", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
                     if (result1 == DialogResult.Yes)
                     {
@@ -1326,6 +1540,124 @@ namespace Roulette
                     e.Handled = true;
                 }
             }
+        }
+
+        // 멤버-선물 당첨 정보 동기화 오류 자동 보정
+        /// <summary>
+        /// 멤버-선물 당첨 정보 동기화 오류 자동 보정
+        /// - 각 멤버의 mResultColumn 값이 1 이상인 경우, (mResultColumn-1)번째 dgvGifts의 gMemberColumn 값과 mMemberColumn 값을 비교
+        /// - 다르면, 해당 멤버의 mResultColumn과 해당 선물의 gMemberColumn을 모두 공백(리셋)
+        /// - 남은 선물(gMemberColumn)도 모두 리셋
+        /// </summary>
+        private void SyncGiftMemberWithResult()
+        {
+            // 1. mResultColumn이 입력된 멤버 추출
+            var memberRows = dgvMembers.Rows
+                .Cast<DataGridViewRow>()
+                .Where(r => !r.IsNewRow)
+                .Select(r => new
+                {
+                    Row = r,
+                    Name = r.Cells["mMemberColumn"].Value?.ToString() ?? "",
+                    ResultStr = r.Cells["mResultColumn"].Value?.ToString() ?? ""
+                })
+                .Where(x => int.TryParse(x.ResultStr, out _))
+                .Select(x => new
+                {
+                    x.Row,
+                    x.Name,
+                    Result = int.Parse(x.ResultStr)
+                })
+                .Where(x => x.Result > 0)
+                .ToList();
+
+            // 2. 선물 행 추출
+            var giftRows = dgvGifts.Rows
+                .Cast<DataGridViewRow>()
+                .Where(r => !r.IsNewRow)
+                .ToList();
+
+            // 3. 잘못된 정보가 있는 멤버/선물 이름 수집
+            var namesToReset = new HashSet<string>();
+            foreach (var member in memberRows)
+            {
+                int giftIdx = member.Result - 1;
+                if (giftIdx < 0 || giftIdx >= giftRows.Count)
+                {
+                    // 선물 인덱스가 없으면 멤버 결과만 리셋 대상
+                    namesToReset.Add(member.Name);
+                    continue;
+                }
+                var giftRow = giftRows[giftIdx];
+                string giftMember = giftRow.Cells["gMemberColumn"].Value?.ToString() ?? "";
+                if (member.Name != giftMember)
+                {
+                    namesToReset.Add(member.Name);
+                }
+            }
+
+            // 4. 동일한 이름이 mMemberColumn, gMemberColumn에 있는 모든 항목 리셋
+            foreach (var name in namesToReset)
+            {
+                // mMemberColumn에서 해당 이름의 mResultColumn 모두 리셋
+                foreach (DataGridViewRow row in dgvMembers.Rows)
+                {
+                    if (row.IsNewRow) continue;
+                    if ((row.Cells["mMemberColumn"].Value?.ToString() ?? "") == name)
+                    {
+                        row.Cells["mResultColumn"].Value = "";
+                    }
+                }
+                // gMemberColumn에서 해당 이름 모두 리셋
+                foreach (DataGridViewRow row in dgvGifts.Rows)
+                {
+                    if (row.IsNewRow) continue;
+                    if ((row.Cells["gMemberColumn"].Value?.ToString() ?? "") == name)
+                    {
+                        row.Cells["gMemberColumn"].Value = "";
+                    }
+                }
+            }
+
+            // 5. 선물(gMemberColumn) 중, mResultColumn이 일치하지 않는 나머지는 모두 리셋
+            var validGiftIndexes = memberRows
+                .Where(x => !namesToReset.Contains(x.Name))
+                .Select(x => x.Result - 1)
+                .Where(idx => idx >= 0 && idx < giftRows.Count)
+                .ToHashSet();
+
+            for (int i = 0; i < giftRows.Count; i++)
+            {
+                if (!validGiftIndexes.Contains(i))
+                {
+                    giftRows[i].Cells["gMemberColumn"].Value = "";
+                }
+            }
+            nameList = dgvMembers.Rows
+                .Cast<DataGridViewRow>()
+                .Where(row => !row.IsNewRow)
+                .Select(row => row.Cells["mMemberColumn"].Value?.ToString())
+                .Where(n => !string.IsNullOrEmpty(n))
+                .ToList();
+
+            selectedNames = dgvMembers.Rows
+                .Cast<DataGridViewRow>()
+                .Where(row => !row.IsNewRow)
+                .Where(row => !string.IsNullOrEmpty(row.Cells["mResultColumn"].Value?.ToString()))
+                .Select(row => row.Cells["mMemberColumn"].Value?.ToString())
+                .Where(n => !string.IsNullOrEmpty(n))
+                .ToList();
+
+            remainingNames = dgvMembers.Rows
+                .Cast<DataGridViewRow>()
+                .Where(row => !row.IsNewRow)
+                .Select(row => row.Cells["mMemberColumn"].Value?.ToString()?.Trim())
+                .Where(n => !string.IsNullOrEmpty(n))
+                .Except(selectedNames)
+                .ToList();
+
+            RedrawWheel();
+            pbSpin.Invalidate();
         }
 
         // 로그 기록
@@ -1359,7 +1691,7 @@ namespace Roulette
         // 프로그램 종료
         private void btnExit_Click(object sender, EventArgs e)
         {
-            Roulette_FormClosing(sender, new FormClosingEventArgs(CloseReason.UserClosing, false)); // 종료 확인 메시지 호출
+            this.Close(); // 폼 닫기
         }
         private void Roulette_FormClosing(object sender, FormClosingEventArgs e)
         {
