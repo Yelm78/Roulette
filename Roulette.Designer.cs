@@ -273,10 +273,13 @@ namespace Roulette
             Controls.Add(pbWheel);
             Controls.Add(btnSpin);
             Controls.Add(btnExit);
+            HelpButton = true;
             Icon = (System.Drawing.Icon)resources.GetObject("$this.Icon");
+            MinimizeBox = false;
             MinimumSize = new System.Drawing.Size(800, 430);
             Name = "Roulette";
             Text = "Roulette Wheel";
+            TopMost = true;
             FormClosing += Roulette_FormClosing;
             Resize += Roulette_Resize;
             ((System.ComponentModel.ISupportInitialize)pbWheel).EndInit();
