@@ -1,10 +1,9 @@
 MGM Roulette
 
-
-● 프로그램 실행시 member.csv, gift.csv 파일 자동로딩(선택사항)
+● 프로그램 실행시 members.csv, gifts.csv 파일 자동로딩(선택사항)
   - 최초에는 멤버명과 선물명 만 입력, 룰렛의 결과에 따라 당첨순서와 당첨멤버 자동 입력
-  - member.csv : 멤버명, 당첨된 순서
-  - gift.csv : 선물명, 당첨된 멤버
+  - members.csv : 멤버명, 당첨된 순서
+  - gifts.csv : 선물명, 당첨된 멤버
 
 
 ● 회전판

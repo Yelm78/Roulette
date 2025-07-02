@@ -106,6 +106,7 @@ namespace Roulette
             dgvMembers.Anchor = System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right;
             dgvMembers.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
             dgvMembers.Columns.AddRange(new System.Windows.Forms.DataGridViewColumn[] { mMemberColumn, mResultColumn });
+            dgvMembers.EditMode = System.Windows.Forms.DataGridViewEditMode.EditOnF2;
             dgvMembers.Location = new System.Drawing.Point(385, 27);
             dgvMembers.Name = "dgvMembers";
             dgvMembers.RowHeadersVisible = false;
@@ -135,6 +136,7 @@ namespace Roulette
             dgvGifts.Anchor = System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right;
             dgvGifts.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
             dgvGifts.Columns.AddRange(new System.Windows.Forms.DataGridViewColumn[] { gGiftColumn, gMemberColumn });
+            dgvGifts.EditMode = System.Windows.Forms.DataGridViewEditMode.EditOnF2;
             dgvGifts.Location = new System.Drawing.Point(582, 27);
             dgvGifts.Name = "dgvGifts";
             dgvGifts.RowHeadersVisible = false;

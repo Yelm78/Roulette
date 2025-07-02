@@ -12,6 +12,7 @@ using System.Linq;
 using System.Xml.Linq;
 using static System.Windows.Forms.VisualStyles.VisualStyleElement;
 using static System.Net.Mime.MediaTypeNames;
+using System.Collections.Concurrent;
 
 namespace Roulette
 {
@@ -22,6 +23,12 @@ namespace Roulette
         private static readonly object memberCsvLock = new object();
         private static readonly object giftCsvLock = new object();
         private static readonly object logLock = new object();
+
+        private static readonly BlockingCollection<string> logQueue = new BlockingCollection<string>(new ConcurrentQueue<string>());
+        private static readonly CancellationTokenSource logCts = new CancellationTokenSource();
+        private static Task logTask;
+
+        private bool isLoading = false;
 
         // 멤버, 남은 멤버, 당첨 멤버 리스트
         private List<string> nameList = new List<string>();
@@ -74,6 +81,11 @@ namespace Roulette
             try // [INIT]
             {
                 InitializeComponent();
+
+                if (logTask == null)
+                {
+                    logTask = Task.Run(() => LogWorker(logCts.Token));
+                }
 
                 LogWrite("[Application Launch] ");
                 KeyPreview = true;
@@ -184,13 +196,15 @@ namespace Roulette
         // 멤버/선물 CSV 파일 비동기 로드 및 UI 반영
         private async Task LoadCsvFilesAsync()
         {
+            isLoading = true; // 로딩 시작
+
             string[] memberLines;
             string[] giftLines;
 
             try // [LOADCSV-READ]
             {
-                memberLines = File.Exists("member.csv") ? await Task.Run(() => File.ReadAllLines("member.csv")) : Array.Empty<string>();
-                giftLines = File.Exists("gift.csv") ? await Task.Run(() => File.ReadAllLines("gift.csv")) : Array.Empty<string>();
+                memberLines = File.Exists("members.csv") ? await Task.Run(() => File.ReadAllLines("members.csv")) : Array.Empty<string>();
+                giftLines = File.Exists("gifts.csv") ? await Task.Run(() => File.ReadAllLines("gifts.csv")) : Array.Empty<string>();
             }
             catch (Exception ex)
             {
@@ -211,57 +225,65 @@ namespace Roulette
                         nameList.Clear();
                         remainingNames.Clear();
                         selectedNames.Clear();
+
+                        // DataGridView 업데이트 최적화
+                        dgvMembers.SuspendLayout();
+                        dgvGifts.SuspendLayout();
                         dgvMembers.Rows.Clear();
                         dgvGifts.Rows.Clear();
+
+                        foreach (var line in memberLines)
+                        {
+                            try
+                            {
+                                var parts = line.Split(',');
+                                string name = parts[0].Trim();
+                                name = name.Replace("\"", ""); // 따옴표 제거
+                                string result = parts.Length > 1 ? parts[1].Trim() : "";
+                                if (!string.IsNullOrEmpty(name) && !nameList.Contains(name))
+                                {
+                                    int rowIndex = dgvMembers.Rows.Add();
+                                    dgvMembers.Rows[rowIndex].Cells["mMemberColumn"].Value = name;
+                                    dgvMembers.Rows[rowIndex].Cells["mResultColumn"].Value = result;
+                                    nameList.Add(name);
+
+                                    if (!string.IsNullOrEmpty(result))
+                                        selectedNames.Add(name);
+                                    else
+                                        remainingNames.Add(name);
+                                }
+                            }
+                            catch (Exception ex) { LogWrite("[LOADCSV-UIUPDATE-MEMBERROW] " + ex); }
+                        }
+
+                        foreach (var line in giftLines)
+                        {
+                            try
+                            {
+                                var parts = line.Split(',');
+                                string gift = parts[0].Trim();
+                                gift = gift.Replace("\"", ""); // 따옴표 제거
+                                string member = parts.Length > 1 ? parts[1].Trim() : "";
+                                if (!string.IsNullOrEmpty(gift))
+                                {
+                                    int rowIndex = dgvGifts.Rows.Add();
+                                    dgvGifts.Rows[rowIndex].Cells["gGiftColumn"].Value = gift;
+                                    dgvGifts.Rows[rowIndex].Cells["gMemberColumn"].Value = member;
+                                }
+                            }
+                            catch (Exception ex) { LogWrite("[LOADCSV-UIUPDATE-GIFTROW] " + ex); }
+                        }
+                        dgvMembers.ResumeLayout();
+                        dgvGifts.ResumeLayout();
                     }
                     catch (Exception ex) { LogWrite("[LOADCSV-UIUPDATE-CLEAR] " + ex); }
-
-                    foreach (var line in memberLines)
-                    {
-                        try
-                        {
-                            var parts = line.Split(',');
-                            string name = parts[0].Trim();
-                            name = name.Replace("\"", ""); // 따옴표 제거
-                            string result = parts.Length > 1 ? parts[1].Trim() : "";
-                            if (!string.IsNullOrEmpty(name) && !nameList.Contains(name))
-                            {
-                                int rowIndex = dgvMembers.Rows.Add();
-                                dgvMembers.Rows[rowIndex].Cells["mMemberColumn"].Value = name;
-                                dgvMembers.Rows[rowIndex].Cells["mResultColumn"].Value = result;
-                                nameList.Add(name);
-
-                                if (!string.IsNullOrEmpty(result))
-                                    selectedNames.Add(name);
-                                else
-                                    remainingNames.Add(name);
-                            }
-                        }
-                        catch (Exception ex) { LogWrite("[LOADCSV-UIUPDATE-MEMBERROW] " + ex); }
-                    }
-
-                    foreach (var line in giftLines)
-                    {
-                        try
-                        {
-                            var parts = line.Split(',');
-                            string gift = parts[0].Trim();
-                            gift = gift.Replace("\"", ""); // 따옴표 제거
-                            string member = parts.Length > 1 ? parts[1].Trim() : "";
-                            if (!string.IsNullOrEmpty(gift))
-                            {
-                                int rowIndex = dgvGifts.Rows.Add();
-                                dgvGifts.Rows[rowIndex].Cells["gGiftColumn"].Value = gift;
-                                dgvGifts.Rows[rowIndex].Cells["gMemberColumn"].Value = member;
-                            }
-                        }
-                        catch (Exception ex) { LogWrite("[LOADCSV-UIUPDATE-GIFTROW] " + ex); }
-                    }
                 }, CancellationToken.None, TaskCreationOptions.None, TaskScheduler.FromCurrentSynchronizationContext());
             }
             catch (Exception ex) { LogWrite("[LOADCSV-UIUPDATE] " + ex); }
 
-            try { RedrawWheel(); } catch (Exception ex) { LogWrite("[LOADCSV-REDRAWWHEEL] " + ex); }
+            isLoading = false; // 로딩 끝
+
+            try { await Task.Run(() => RedrawWheel()); } catch (Exception ex) { LogWrite("[LOADCSV-REDRAWWHEEL] " + ex); }
         }
 
         // 회전판 위에 바늘(삼각형) 그리기
@@ -289,7 +311,7 @@ namespace Roulette
         // 회전판 이미지 새로 그리기
         // 회전판에 표시될 섹션(멤버 이름 등)을 모두 그려서 Bitmap으로 만들어 저장
         // spinning(회전 중)일 때는 새로 그리지 않음 (메모리 누수 방지)
-        private void RedrawWheel()
+        private async void RedrawWheel()
         {
             if (spinning) return; // 회전 중에는 새로 그리지 않음
 
@@ -301,18 +323,34 @@ namespace Roulette
                     pbWheel.Image.Dispose();
                 pbWheel.Image = null; // 이전 이미지 참조 해제
                 cachedWheelImage?.Dispose();
+
+                // 비동기 이미지 생성
+                Bitmap newImage = null;
                 try
                 {
-                    // 새 회전판 이미지를 생성해서 캐시에 저장
-                    cachedWheelImage = DrawWheelImage(angle);
-                    pbWheel.Image = cachedWheelImage ?? throw new Exception("회전판 이미지 생성 실패");
+                    newImage = await Task.Run(() => DrawWheelImage(angle));
                 }
                 catch (Exception ex)
                 {
-                    pbWheel.Image = null;
+                    LogWrite("[REDRAWWHEEL-ASYNC] " + ex);
                 }
-                UpdatePbSpinBackColor();
-                CenterSpinButton();
+
+                // UI 스레드에서 이미지 적용
+                if (pbWheel.InvokeRequired)
+                {
+                    pbWheel.Invoke(new Action(() =>
+                    {
+                        pbWheel.Image = newImage;
+                        UpdatePbSpinBackColor();
+                        CenterSpinButton();
+                    }));
+                }
+                else
+                {
+                    pbWheel.Image = newImage;
+                    UpdatePbSpinBackColor();
+                    CenterSpinButton();
+                }
             }
             catch (Exception ex) { LogWrite("[REDRAWWHEEL] " + ex); }
         }
@@ -322,6 +360,11 @@ namespace Roulette
         {
             try // [DRAWWHEELIMAGE]
             {
+                if (remainingNames.Count == 0)
+                {
+                    return new Bitmap(Math.Max(1, pbWheel.Width), Math.Max(1, pbWheel.Height));
+                }
+
                 pbWheel.Paint -= SelectionMarker;
                 pbWheel.Paint += SelectionMarker;
 
@@ -347,7 +390,8 @@ namespace Roulette
                             catch (Exception ex) { LogWrite("[DRAWWHEELIMAGE-COLOR] " + ex); }
                         }
 
-                        for (int i = 0; i < remainingNames.Count; i++)
+                        int count = Math.Min(remainingNames.Count, pastelBrushes.Count);
+                        for (int i = 0; i < count; i++)
                         {
                             // 각 멤버 이름을 섹션에 그림
                             try
@@ -884,7 +928,7 @@ namespace Roulette
                     {
                         lock (memberCsvLock)
                         {
-                            File.WriteAllLines("member.csv", lines);
+                            File.WriteAllLines("members.csv", lines);
                         }
                     });
                 }
@@ -926,7 +970,7 @@ namespace Roulette
                     {
                         lock (giftCsvLock)
                         {
-                            File.WriteAllLines("gift.csv", lines);
+                            File.WriteAllLines("gifts.csv", lines);
                         }
                     });
                 }
@@ -1053,8 +1097,15 @@ namespace Roulette
             if (dgvMembers.Columns[e.ColumnIndex].Name == "mMemberColumn")
                 prevMemberName = dgvMembers.Rows[e.RowIndex].Cells[e.ColumnIndex].Value?.ToString() ?? "";
         }
+        private void dgvGifts_CellBeginEdit(object sender, DataGridViewCellCancelEventArgs e)
+        {
+            if (dgvGifts.Columns[e.ColumnIndex].Name == "gGiftColumn")
+                prevGiftName = dgvGifts.Rows[e.RowIndex].Cells[e.ColumnIndex].Value?.ToString() ?? "";
+        }
         private void dgvMembers_CellValueChanged(object sender, DataGridViewCellEventArgs e)
         {
+            if (isLoading) return; // 로딩 중이면 무시
+
             try
             {
                 // mMemberColumn(이름) 컬럼만 체크
@@ -1076,11 +1127,50 @@ namespace Roulette
                             dgvMembers.Rows[e.RowIndex].Cells[e.ColumnIndex].Value = prevMemberName; // 중복이면 이전 값으로 되돌림
                             return;
                         }
+                        if (prevMemberName != newValue)
+                        {
+                            LogWrite($"ModifyMember: {prevMemberName} -> {newValue}");
+                        }
                     }
                 }
                 RedrawWheel();
             }
             catch (Exception ex) { LogWrite("[MEMBERS-CELLVALUECHANGED] " + ex); }
+        }
+        private void dgvGifts_CellValueChanged(object sender, DataGridViewCellEventArgs e)
+        {
+            if (isLoading) return; // 로딩 중이면 무시
+
+            try
+            {
+                // gGiftColumn(선물명) 컬럼만 체크
+                if (dgvGifts.Columns[e.ColumnIndex].Name == "gGiftColumn")
+                {
+                    string newValue = dgvGifts.Rows[e.RowIndex].Cells[e.ColumnIndex].Value?.ToString() ?? "";
+                    if (!string.IsNullOrWhiteSpace(newValue))
+                    {
+                        int count = 0;
+                        foreach (DataGridViewRow row in dgvGifts.Rows)
+                        {
+                            if (row.IsNewRow) continue;
+                            if ((row.Cells["gGiftColumn"].Value?.ToString() ?? "") == newValue)
+                                count++;
+                        }
+                        //if (count > 1)
+                        //{
+                        //    MessageBox.Show("이미 존재하는 선물명입니다.", "중복 경고", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        //    dgvGifts.Rows[e.RowIndex].Cells[e.ColumnIndex].Value = prevGiftName; // 중복이면 이전 값으로 되돌림
+                        //    return;
+                        //}
+                        if (prevGiftName != newValue)
+                        {
+                            LogWrite($"ModifyGift: {prevGiftName} -> {newValue}");
+                        }
+                    }
+                }
+                RedrawWheel();
+            }
+            catch (Exception ex) { LogWrite("[GIFTS-CELLVALUECHANGED] " + ex); }
         }
         private void dgvMembers_PasteAndDelete(object sender, KeyEventArgs e)
         {
@@ -1089,6 +1179,8 @@ namespace Roulette
             {
                 try
                 {
+                    isLoading = true; // 로딩 시작
+
                     string clipboardText = Clipboard.GetText();
                     if (!string.IsNullOrEmpty(clipboardText))
                     {
@@ -1103,11 +1195,14 @@ namespace Roulette
                                 dgvMembers.Rows[rowIndex].Cells["mResultColumn"].Value = "";
                                 nameList.Add(name);
                                 remainingNames.Add(name);
+                                LogWrite("AddMember(Paste): " + name);
                             }
                         }
                         _ = SaveMembersToCsv();
                         RedrawWheel();
                     }
+
+                    isLoading = false; // 로딩 끝
                 }
                 catch (Exception ex)
                 {
@@ -1141,9 +1236,13 @@ namespace Roulette
                                 if (!dgvMembers.Rows[rowIndex].IsNewRow)
                                 {
                                     string name = dgvMembers.Rows[rowIndex].Cells["mMemberColumn"].Value?.ToString() ?? "";
-                                    nameList.Remove(name);
-                                    remainingNames.Remove(name);
-                                    selectedNames.Remove(name);
+                                    //nameList.Remove(name);
+                                    //remainingNames.Remove(name);
+                                    //selectedNames.Remove(name);
+                                    nameList.RemoveAll(n => n.Equals(name, StringComparison.OrdinalIgnoreCase));
+                                    remainingNames.RemoveAll(n => n.Equals(name, StringComparison.OrdinalIgnoreCase));
+                                    selectedNames.RemoveAll(n => n.Equals(name, StringComparison.OrdinalIgnoreCase));
+                                    LogWrite("DeleteMember: " + name);
                                     dgvMembers.Rows.RemoveAt(rowIndex);
                                 }
                             }
@@ -1155,40 +1254,6 @@ namespace Roulette
                 }
             }
         }
-        private void dgvGifts_CellBeginEdit(object sender, DataGridViewCellCancelEventArgs e)
-        {
-            if (dgvGifts.Columns[e.ColumnIndex].Name == "gGiftColumn")
-                prevGiftName = dgvGifts.Rows[e.RowIndex].Cells[e.ColumnIndex].Value?.ToString() ?? "";
-        }
-        private void dgvGifts_CellValueChanged(object sender, DataGridViewCellEventArgs e)
-        {
-            try
-            {
-                // gGiftColumn(선물명) 컬럼만 체크
-                if (dgvGifts.Columns[e.ColumnIndex].Name == "gGiftColumn")
-                {
-                    string newValue = dgvGifts.Rows[e.RowIndex].Cells[e.ColumnIndex].Value?.ToString() ?? "";
-                    if (!string.IsNullOrWhiteSpace(newValue))
-                    {
-                        int count = 0;
-                        foreach (DataGridViewRow row in dgvGifts.Rows)
-                        {
-                            if (row.IsNewRow) continue;
-                            if ((row.Cells["gGiftColumn"].Value?.ToString() ?? "") == newValue)
-                                count++;
-                        }
-                        if (count > 1)
-                        {
-                            MessageBox.Show("이미 존재하는 선물명입니다.", "중복 경고", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                            dgvGifts.Rows[e.RowIndex].Cells[e.ColumnIndex].Value = prevGiftName; // 중복이면 이전 값으로 되돌림
-                            return;
-                        }
-                    }
-                }
-                RedrawWheel();
-            }
-            catch (Exception ex) { LogWrite("[GIFTS-CELLVALUECHANGED] " + ex); }
-        }
         private void dgvGifts_PasteAndDelete(object sender, KeyEventArgs e)
         {
             // 선물 붙여넣기
@@ -1196,6 +1261,8 @@ namespace Roulette
             {
                 try
                 {
+                    isLoading = true; // 로딩 시작
+
                     string clipboardText = Clipboard.GetText();
                     if (!string.IsNullOrEmpty(clipboardText))
                     {
@@ -1208,11 +1275,14 @@ namespace Roulette
                                 int rowIndex = dgvGifts.Rows.Add();
                                 dgvGifts.Rows[rowIndex].Cells["gGiftColumn"].Value = gift;
                                 dgvGifts.Rows[rowIndex].Cells["gMemberColumn"].Value = "";
+                                LogWrite("AddGift(Paste): " + gift);
                             }
                         }
                         _ = SaveGiftsToCsv();
                         RedrawWheel();
                     }
+
+                    isLoading = false; // 로딩 끝
                 }
                 catch (Exception ex)
                 {
@@ -1244,6 +1314,8 @@ namespace Roulette
                             {
                                 if (!dgvGifts.Rows[rowIndex].IsNewRow)
                                 {
+                                    string gift = dgvGifts.Rows[rowIndex].Cells["gGiftColumn"].Value?.ToString() ?? "";
+                                    LogWrite("DeleteGift: " + gift);
                                     dgvGifts.Rows.RemoveAt(rowIndex);
                                 }
                             }
@@ -1259,7 +1331,29 @@ namespace Roulette
         // 로그 기록
         private void LogWrite(string message)
         {
-            try { Task.Run(() => { try { lock (logLock) { File.AppendAllText("Roulette.log", $"\n{DateTime.Now}: {message}\n"); } } catch (Exception) { /* 로그 기록 실패시 재귀 방지 */ } }); } catch (Exception) { /* 로그 기록 실패시 재귀 방지 */ }
+            try
+            {
+                logQueue.Add($"{DateTime.Now}: {message}");
+            }
+            catch { /* 큐가 닫혔을 때 예외 무시 */ }
+        }
+        private void LogWorker(CancellationToken token)
+        {
+            try
+            {
+                foreach (var log in logQueue.GetConsumingEnumerable(token))
+                {
+                    try
+                    {
+                        lock (logLock)
+                        {
+                            File.AppendAllText("Roulette.log", "\n" + log + "\n");
+                        }
+                    }
+                    catch { /* 파일 기록 실패시 무시 */ }
+                }
+            }
+            catch (OperationCanceledException) { /* 종료 시 정상 */ }
         }
 
         // 프로그램 종료
@@ -1284,6 +1378,9 @@ namespace Roulette
             }
 
             LogWrite("[Application Close] ");
+            logCts.Cancel();
+            logQueue.CompleteAdding();
+            try { logTask?.Wait(1000); } catch { }
         }
     }
 }
