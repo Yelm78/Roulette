@@ -763,7 +763,7 @@ namespace Roulette
             }
         }
 
-        // 이미지를 지정 각도만큼 회전
+        // 이미지를 지정 각도만큼 회전(메모리 누수로 이미지 새로 그리는 방식으로 바꾸면서 사용 안 함)
         private Bitmap RotateImage(Bitmap src, float angle)
         {
             try // [ROTATEIMAGE]
