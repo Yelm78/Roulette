@@ -6,6 +6,8 @@
     <UseWindowsForms>true</UseWindowsForms>
     <RootNamespace>Roulette</RootNamespace>
     <ApplicationIcon>Resources\MGM.ico</ApplicationIcon>
+    <RepositoryUrl>https://github.com/Yelm78/Roulette</RepositoryUrl>
+    <PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
@@ -41,6 +43,13 @@
       <Generator>ResXFileCodeGenerator</Generator>
       <LastGenOutput>Resources.Designer.cs</LastGenOutput>
     </EmbeddedResource>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="LICENSE.txt">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
   </ItemGroup>
 
 </Project>
