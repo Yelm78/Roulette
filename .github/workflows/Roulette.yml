@@ -9,23 +9,18 @@ jobs:
         runs-on: windows-latest
 
         steps:
-            - uses: actions/checkout@v3
-            - name: Setup .NET Core
-              uses: actions/setup-dotnet@v3
-              with:
-                 dotnet-version: ${{ env.DOTNET_VERSION }}        
-            - name: Install dependencies
-              run: dotnet restore
+            - uses: actions/checkout@v2
+            - name: Add msbuild to PATH
+              uses: microsoft/setup-msbuild@v1.1
+            - name: Restore Nuget Packages using msbuild
+              run: msbuild -t:restore
             - name: Build
-              run: |
-                  cd DotNet.WebApp
-                  dotnet build --configuration Release --no-restore
-                  dotnet publish -c Release -o ../dotnet-webapp -r linux-x64 --self-contained true /p:UseAppHost=true
+              run: msbuild Editor.csproj -t:rebuild -verbosity:diag -property:Configuration=Release
             - name: Upload Artifacts
               uses: actions/upload-artifact@v2
               with:
                   name: Roulette
-                  path: ./bin\Release\net8.0-windows7.0\publish\win-x86
+                  path: ./bin/Release/net8.0-windows7.0/publish/win-x86
             - uses: Klemensas/action-autotag@stable
               id: autotag
               with:
@@ -39,7 +34,7 @@ jobs:
                   tag_name: ${{ steps.autotag.outputs.tagname }}
                   release_name: Roulette v${{ steps.autotag.outputs.tagname }} Release
                   body: |
-                      publish
+                      Publishing
                   draft: false
                   prerelease: false
             - name: ZIP Arhcive using powershell
