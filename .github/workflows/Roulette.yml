@@ -50,12 +50,13 @@ jobs:
 
     strategy:
       matrix:
-        configuration: [Debug, Release]
+        #configuration: [Debug, Release]
+        configuration: [Release] # 수정
 
     runs-on: windows-latest  # For a list of available runner types, refer to
                              # https://help.github.com/en/actions/reference/workflow-syntax-for-github-actions#jobsjob_idruns-on
 
-    env: # 이 부분만 수정했음
+    env: # 아래 4개 항목 수정
       Solution_Name: Roulette.sln                               # Replace with your solution name, i.e. MyWpfApp.sln.
       Test_Project_Path: .\Roulette.csproj                      # Replace with the path to your test project, i.e. MyWpfApp.Tests\MyWpfApp.Tests.csproj.
       Wap_Project_Directory: .\                                 # Replace with the Wap project directory relative to the solution, i.e. MyWpfApp.Package.
@@ -104,7 +105,7 @@ jobs:
         Configuration: ${{ matrix.configuration }}
 
 
-    # 여기부터 내용 추가 ====================================================================================================
+    # 수정(추가) ====================================================================================================
 
     - name: Get Release Version
       if: startsWith(steps.merge_message.outputs.message, 'Release') && job.status == 'success'
@@ -126,7 +127,7 @@ jobs:
         prerelease: false
       # 'Release'로 시작하는 커밋 메시지를 가지고 성공적으로 빌드되었을 때, GitHub에 릴리즈 태그를 생성합니다.
 
-    # 여기까지 내용 추가 ====================================================================================================
+    # 수정(추가) ====================================================================================================
 
 
     # Remove the pfx
