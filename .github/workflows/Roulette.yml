@@ -103,6 +103,32 @@ jobs:
         Appx_Package_Build_Mode: StoreUpload
         Configuration: ${{ matrix.configuration }}
 
+
+    # 여기부터 내용 추가 ====================================================================================================
+
+    - name: Get Release Version
+      if: startsWith(steps.merge_message.outputs.message, 'Release') && job.status == 'success'
+      run: |
+        echo "::set-output name=version::$(("${{steps.merge_message.outputs.message}}" -replace 'Release ', ''))"
+      id: extract_release_version
+      # 'Release'로 시작하는 커밋 메시지를 가지고 성공적으로 빌드되었을 때, 버전 정보를 추출하여 output 변수에 저장합니다.
+
+    - name: Create release tag
+      if: startsWith(steps.merge_message.outputs.message, 'Release') && job.status == 'success'
+      uses: actions/create-release@v1 
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ steps.extract_release_version.outputs.version }}
+        release_name: Release ${{ steps.extract_release_version.outputs.version }} v${{ github.run_number }}
+        body: ${{ steps.merge_message.outputs.message }}
+        draft: false
+        prerelease: false
+      # 'Release'로 시작하는 커밋 메시지를 가지고 성공적으로 빌드되었을 때, GitHub에 릴리즈 태그를 생성합니다.
+
+    # 여기까지 내용 추가 ====================================================================================================
+
+
     # Remove the pfx
     - name: Remove the pfx
       run: Remove-Item -path $env:Wap_Project_Directory\GitHubActionsWorkflow.pfx
